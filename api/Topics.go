@@ -1,5 +1,5 @@
 // Package hubapi with messaging topics to connect to the message bus
-package hubapi
+package api
 
 // TopicRoot is the base of the topic
 const TopicRoot = "things"

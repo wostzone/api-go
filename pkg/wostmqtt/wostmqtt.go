@@ -3,7 +3,7 @@ package wostmqtt
 import (
 	"strings"
 
-	"github.com/wostzone/api/wostapi"
+	"github.com/wostzone/hubapi/api"
 )
 
 /* Client library with the MQTT API to the Hub using (tbd):
@@ -33,7 +33,7 @@ func (wmc *WostMqttClient) Stop() {
 // PublishTD publish a Thing description to the WoST hub
 // Intended to by used by a Thing to publish an update to its TD
 func (wmc *WostMqttClient) PublishTD(thingID string, td []byte) error {
-	topic := strings.ReplaceAll(wostapi.TopicThingTD, "{id}", thingID)
+	topic := strings.ReplaceAll(api.TopicThingTD, "{id}", thingID)
 	err := wmc.mqttClient.Publish(topic, td)
 	return err
 }
@@ -41,7 +41,7 @@ func (wmc *WostMqttClient) PublishTD(thingID string, td []byte) error {
 // PublishPropertyValues publish a Thing property values to the WoST hub
 // Intended to by used by a Thing to publish updates of property values
 func (wmc *WostMqttClient) PublishPropertyValues(thingID string, values []byte) error {
-	topic := strings.ReplaceAll(wostapi.TopicThingPropertyValues, "{id}", thingID)
+	topic := strings.ReplaceAll(api.TopicThingPropertyValues, "{id}", thingID)
 	err := wmc.mqttClient.Publish(topic, values)
 	return err
 }
@@ -49,7 +49,7 @@ func (wmc *WostMqttClient) PublishPropertyValues(thingID string, values []byte) 
 // PublishEvent publish a Thing event to the WoST hub
 // Intended to by used by a Thing
 func (wmc *WostMqttClient) PublishEvent(thingID string, event []byte) error {
-	topic := strings.ReplaceAll(wostapi.TopicThingEvent, "{id}", thingID)
+	topic := strings.ReplaceAll(api.TopicThingEvent, "{id}", thingID)
 	err := wmc.mqttClient.Publish(topic, event)
 	return err
 }
@@ -59,13 +59,13 @@ func (wmc *WostMqttClient) PublishEvent(thingID string, event []byte) error {
 // Whether the action takes place depends on the user's permissions to publish
 // this action.
 func (wmc *WostMqttClient) PublishAction(thingID string, action []byte) error {
-	topic := strings.ReplaceAll(wostapi.TopicThingEvent, "{id}", thingID)
+	topic := strings.ReplaceAll(api.TopicThingEvent, "{id}", thingID)
 	err := wmc.mqttClient.Publish(topic, action)
 	return err
 }
 
 // Create a new instance of the WoST MQTT client
-// This implements the WostAPI interface
+// This implements the Api interface
 func NewWostMqtt(certFolder string) *WostMqttClient {
 	wm := &WostMqttClient{
 		certFolder: certFolder,

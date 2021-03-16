@@ -17,7 +17,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
-	"github.com/wostzone/hub/pkg/certsetup"
+	"github.com/wostzone/hubapi/pkg/certsetup"
 )
 
 // DefaultConnectTimeout the default connection timeout is 1 hour

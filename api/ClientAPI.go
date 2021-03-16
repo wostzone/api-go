@@ -1,5 +1,5 @@
-// Package hubapi with Client library interface definition
-package hubapi
+// Package api with Client library interface definition
+package api
 
 // ClientAPI that connects to the WoST Hub using one of the protocol bindings.
 // Intended for client side libraries. Use of this API allows for changing clients without (many)

@@ -1,6 +1,6 @@
 # WoST Hub API
 
-This repository defines the APIs to use the WoST Hub. It contains the type definitions and client libraries to exchange messages with the hub as well as constructing a Thing Definition document for use by WoST Things.
+This repository defines the API's to use with the WoST Hub. It contains the type definitions and client libraries for Things and consumers to exchange messages with the hub as well as constructing a Thing Definition document for use by WoST Things.
 
 ## Project Status
 

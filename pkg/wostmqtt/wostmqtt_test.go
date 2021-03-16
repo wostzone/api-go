@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wostzone/api/pkg/wostmqtt"
+	"github.com/wostzone/hubapi/pkg/wostmqtt"
 )
 
 const certFolder = "/etc/mosquitto/certs"

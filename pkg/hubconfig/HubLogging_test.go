@@ -7,7 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/wostzone/api/pkg/hubconfig"
+	"github.com/wostzone/hubapi/pkg/hubconfig"
 )
 
 func TestLogging(t *testing.T) {
