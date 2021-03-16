@@ -1,4 +1,5 @@
-package config
+// Package hubconfig with the hub configuration struct and methods
+package hubconfig
 
 import (
 	"io/ioutil"
@@ -60,18 +61,8 @@ func CreateDefaultHubConfig(homeFolder string) *HubConfig {
 	binFolder := path.Dir(appBin)
 	if homeFolder == "" {
 		homeFolder = path.Dir(binFolder)
-
-		// for running within the project tests use the test folder as application root folder
-		// if path.Base(binFolder) != "bin" {
-		// 	// appFolder = path.Join(appFolder, "../test")
-		// 	cwd, _ := os.Getwd()
-		// 	appFolder = path.Join(cwd, "../../test")
-		// }
-		// logrus.Infof("appBin: %s. CWD=%s", appBin, cwd)
 	} else if !path.IsAbs(homeFolder) {
 		// turn relative home folder in absolute path
-		// cwd, _ := os.Getwd()
-		// homeFolder = path.Join(cwd, homeFolder)
 		homeFolder = path.Join(binFolder, homeFolder)
 	}
 	logrus.Infof("AppBin is: %s; Home is: %s", appBin, homeFolder)

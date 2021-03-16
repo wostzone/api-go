@@ -1,6 +1,5 @@
-package wostapi
-
-// WoST MQTT protocol definitions
+// Package hubapi with messaging topics to connect to the message bus
+package hubapi
 
 // TopicRoot is the base of the topic
 const TopicRoot = "things"

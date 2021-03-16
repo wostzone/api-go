@@ -1,4 +1,5 @@
-package config
+// Package hubconfig with commandline configuration handling
+package hubconfig
 
 import (
 	"flag"

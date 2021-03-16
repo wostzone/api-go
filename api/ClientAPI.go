@@ -1,9 +1,10 @@
-package wostapi
+// Package hubapi with Client library interface definition
+package hubapi
 
-// WostAPI for protocol client implementations
-// Standardization on this API allows for changing protocols without many changes to the
-// application or Thing.
-type WostAPI interface {
+// ClientAPI that connects to the WoST Hub using one of the protocol bindings.
+// Intended for client side libraries. Use of this API allows for changing clients without (many)
+// changes to the application.
+type ClientAPI interface {
 	// Start the client connection
 	Start(hostname string, clientID string) error
 

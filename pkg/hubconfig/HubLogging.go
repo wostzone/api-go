@@ -1,5 +1,5 @@
-// Package config with logging configuration functions
-package config
+// Package hubconfig with logging configuration
+package hubconfig
 
 import (
 	"fmt"
@@ -36,9 +36,9 @@ func SetLogging(levelName string, filename string, timeFormat string) error {
 	}
 	var logOut io.Writer = os.Stdout
 	if filename != "" {
-		logFileHandle, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
-		if err != nil {
-			err = fmt.Errorf("SetLogging: Unable to open logfile: %s", err)
+		logFileHandle, err2 := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+		if err2 != nil {
+			err = fmt.Errorf("SetLogging: Unable to open logfile: %s", err2)
 		} else {
 			logrus.Warnf("SetLogging: Send '%s' logging to '%s'", levelName, filename)
 			logOut = io.MultiWriter(logOut, logFileHandle)
