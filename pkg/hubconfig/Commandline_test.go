@@ -36,7 +36,7 @@ func teardown() {
 func TestSetupHubCommandline(t *testing.T) {
 	setup()
 
-	myArgs := strings.Split("--hostname bob --logFile logfile.log --logLevel debug", " ")
+	myArgs := strings.Split("--address bob --logFile logfile.log --logLevel debug", " ")
 	// Remove testing package created commandline and flags so we can test ours
 	// flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	os.Args = append(os.Args[0:1], myArgs...)
@@ -47,7 +47,7 @@ func TestSetupHubCommandline(t *testing.T) {
 
 	flag.Parse()
 	// assert.NoError(t, err)
-	assert.Equal(t, "bob", hubConfig.Messenger.HostPort)
+	assert.Equal(t, "bob", hubConfig.Messenger.Address)
 	assert.Equal(t, "logfile.log", hubConfig.Logging.LogFile)
 	assert.Equal(t, "debug", hubConfig.Logging.Loglevel)
 	// assert.Equal(t, "/etc/cert", hubConfig.Messenger.CertFolder)
@@ -55,8 +55,8 @@ func TestSetupHubCommandline(t *testing.T) {
 
 func TestCommandlineWithError(t *testing.T) {
 	setup()
-	myArgs := strings.Split("--hostname bob --badarg=bad", " ")
-	// myArgs := strings.Split("--hostname bob", " ")
+	myArgs := strings.Split("--address bob --badarg=bad", " ")
+	// myArgs := strings.Split("--address bob", " ")
 	// Remove testing package created commandline and flags so we can test ours
 	// flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	os.Args = append(os.Args[0:1], myArgs...)
@@ -65,7 +65,7 @@ func TestCommandlineWithError(t *testing.T) {
 	// hubConfig.ConfigFolder = path.Join(homeFolder, "test")
 
 	assert.Error(t, err, "Parse flag -badarg should fail")
-	assert.Equal(t, "bob", hubConfig.Messenger.HostPort)
+	assert.Equal(t, "bob", hubConfig.Messenger.Address)
 	teardown()
 }
 
@@ -73,7 +73,7 @@ func TestCommandlineWithError(t *testing.T) {
 func TestSetupHubCommandlineWithExtendedConfig(t *testing.T) {
 	setup()
 
-	myArgs := strings.Split("-c ./config/hub.yaml --home ../../test --hostname bob --extra value1", " ")
+	myArgs := strings.Split("-c ./config/hub.yaml --home ../../test --address bob --extra value1", " ")
 	// Remove testing package commandline arguments so we can test ours
 	// flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	os.Args = append(os.Args[0:1], myArgs...)
@@ -89,7 +89,7 @@ func TestSetupHubCommandlineWithExtendedConfig(t *testing.T) {
 	hubConfig, err := hubconfig.SetupConfig("", "", pluginConfig)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "bob", hubConfig.Messenger.HostPort)
+	assert.Equal(t, "bob", hubConfig.Messenger.Address)
 	assert.Equal(t, "value1", pluginConfig.ExtraVariable)
 }
 

@@ -2,6 +2,7 @@
 package hubconfig
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -19,8 +20,12 @@ const HubLogFile = "hub.log"
 // DefaultCertsFolder with the location of certificates
 const DefaultCertsFolder = "./certs"
 
-// DefaultSmbHost with the default server address and port
-const DefaultSmbHost = "localhost:9678"
+// DefaultPort with MQTT TLS port
+const DefaultPort = 8883
+
+type test interface {
+	hello()
+}
 
 // HubConfig with hub configuration parameters
 type HubConfig struct {
@@ -32,10 +37,11 @@ type HubConfig struct {
 
 	// Messenger configuration of hub plugin messaging
 	Messenger struct {
-		CertFolder string `yaml:"certFolder"` // location of certificates when using TLS. Default is ./certs
-		HostPort   string `yaml:"hostname"`   // hostname:port or ip:port to listen on of message bus
-		Protocol   string `yaml:"protocol"`   // internal, MQTT, default internal
-		Timeout    int    `yaml:"timeout"`    // Client connection timeout in seconds. 0 for indefinite
+		Address    string `yaml:"address"`              // address with hostname or ip of the message bus
+		CertFolder string `yaml:"certFolder,omitempty"` // location of TLS certificates. Default is ./certs
+		Port       int    `yaml:"port,omitempty"`       // optional port, default is 8883 for MQTT TLS
+		Signing    bool   `yaml:"signing,omitempty"`    // Message signing to be used by all publishers, default is false
+		Timeout    int    `yaml:"timeout,omitempty"`    // Client connection timeout in seconds. 0 for indefinite
 	} `yaml:"messenger"`
 
 	Home         string   `yaml:"home"`         // application home directory. Default is parent of executable.
@@ -75,8 +81,8 @@ func CreateDefaultHubConfig(homeFolder string) *HubConfig {
 	}
 	// config.Messenger.CertsFolder = path.Join(homeFolder, "certs")
 	config.Messenger.CertFolder = path.Join(homeFolder, DefaultCertsFolder)
-	config.Messenger.HostPort = DefaultSmbHost // use default "localhost:9678"
-	config.Messenger.Protocol = ""             // use default
+	config.Messenger.Address = "localhost"
+	config.Messenger.Port = DefaultPort
 	config.Logging.Loglevel = "warning"
 	// config.Logging.LogFile = path.Join(homeFolder, "logs/"+HubLogFile)
 	config.Logging.LogFile = path.Join(homeFolder, "./logs/"+HubLogFile)
@@ -131,6 +137,13 @@ func ValidateConfig(config *HubConfig) error {
 			logrus.Errorf("Plugins folder '%s' not found\n", config.PluginFolder)
 			return err
 		}
+	}
+
+	// Address must exist
+	if config.Messenger.Address == "" {
+		err := fmt.Errorf("Message bus address not provided\n")
+		logrus.Error(err)
+		return err
 	}
 
 	return nil

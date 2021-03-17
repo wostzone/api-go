@@ -3,9 +3,10 @@
 
 This document describes the HTTP API used to connect to the WoST Hub. The server side is implemented by the Hub HTTP protocol binding.
 
-It is based on the Dec 2020 draft specification of [WEB Thing API](https://webthings.io/api/) with some changes to make it WoST compatible.
+It is based on the Dec 2020 draft specification of [WEB Thing API](https://webthings.io/api/) and the Form templates proposed in [WoT Binding Templates](https://w3c.github.io/wot-binding-templates/#property-forms).
 
-Note that this is an abbreviated description of the full API. The full API will be defined in Swagger in the future.
+Note that the WoT specification is still in draft. Also note that the specification has some complicated ways of doing simple things. This document includes some proposals to keep things simple. The WoST protocol binding might end up having to implement the simple form and the complicated form once the standard is finalized.
+
 
 ## Security Schemes
 
@@ -17,10 +18,22 @@ Where applicable, the Hub supports the API's with [security schemes](https://www
 * PSKSecurityScheme 
 * OAuth2SecurityScheme
 
-Clients can connect to the API using one of these schemes.
+The intent is that clients can connect to the API using one of these schemes.
 
 
-## HUB HTTP API 
+### Signing and Encryption
+
+The WoT HTTP protocol binding does not specify how to sign and encrypt messages between Consumer and Thing (via the Hub).
+
+The Hub intents to support identity verification through JWS. A Hub that has enabled identity verification requires that all messages are published with a JWS signature using the public key that the Hub provided during provisioning. Consumers can verify the authenticity of the sender.
+
+Last, for messages with sensitive information, a publisher can choose to encrypt the message payload using JWE and the public key of the intended receiver. 
+
+The protocol binding for signing and encryption of messages over MQTT is not specified in the WoT standard. WoST applies this extension as optional to allow for backwards compatibility. See the Message format section for details.
+
+
+
+## HUB HTTP API Methods
 
 This HUB HTTP API is an interface that lets Things send updates and events and answers to request for Thing information.
 
@@ -29,44 +42,20 @@ This HUB HTTP API is an interface that lets Things send updates and events and a
 * Things can publish events
 * Things can retrieve configuration update requests made in the last 24 hours (future)
 * Things can retrieve action requests made in the last 24 hours (future)
-* Consumers can publish action requests
-* Consumers can publish thing property update requests
+* Consumers can request property values via the Hub
+* Consumers can publish action requests via the Hub
+* Consumers can publish thing property update (configuration update) requests via the Hub
 
-This interface has the following limitations:
-* This API is not a Directory Service. See the directory service for more information on its API to query for Things. (once it is defined)
-* This API does not support requests for historical values. See the history service for more information (well, once it is defined)
 
 ### Provisioning
 
-A WoST compatible device must be provisioned using one of the client API's. When a device is provisioned by the Hub, they exchange credentials for secured connectivity and message exchange. The credentials are defined by the security schemes. A device manage multiple Things.
+Before a device can exchange Thing information with the Hub and its consumers it must be provisioned. Provisioning means exchanging credentials for secure connectivity and identification. The credentials are defined by the security schemes. 
 
 > ### This section is still to be defined
 
-### Get a Thing Description
-=== FUTURE ===
-This returns the most receive Thing Description from the shadow registry
-
-> ### Request 
-> ```http
-> HTTP Get https://{hub}/things/{id}
-> Accept: application/json
-> ```
-
-> ### Response
-> 200 OK
-> ```json
-> {
->    Full TD
-> }
-> ```
-
-> ### Response
-> 404 NOT FOUND
-> ```
-
 ### Update a Thing Description Document
 
-This updates a Thing Description Document in the shadow registry.
+Thing sends an update of the a Thing Description Document.
 
 > ### Request 
 > ```http
@@ -86,15 +75,22 @@ Where
 * {id} is the ID of the thing
 
 
-### Get All Thing Property Values
+### Get Thing Property Values
 
 ==Future==
 
-This returns the property values of a Thing from the shadow registry.
+This returns the property values of a Thing from the Hub shadow registry.
+TODO: Use the [Property Forms](https://w3c.github.io/wot-binding-templates/#property-forms) to advertise how to get the property values.
+
+TBD: Note: This seems unnecesary complex. The readOnly/writeOnly requirements mentioned is just asking for confusion. Also having multiple methods for the same thing like readproperty, readallproperties, readmultipleproperties is unnecesary.
+
+Proposal 1: Change the readOnly/writeOnly attributes to 'writable'. readonly is implied.
+Proposal 2: Have only a single opvalue for readproperty. Return the properties (one or more) specified. If no properties are specified then return all.
+Proposal 3: Have only a single opvalue for writeproperty. Simply write the properties specified.
 
 > #### request
 > ```http
-> HTTP GET https://{hub}/things/{id}/properties
+> HTTP GET https://{hub}/things/{id}/values
 > Accept: application/json
 > ```
 > ### Response

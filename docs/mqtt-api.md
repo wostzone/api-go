@@ -10,15 +10,20 @@ Note that this is an abbreviated description of the full API. The full API will 
 ## Security Schemes
 
 Where applicable, the Hub supports the API's with [security schemes](https://www.w3.org/TR/wot-thing-description/): 
-* BasicSecurityScheme
-* DigestSecurityScheme
-* APIKeySecurityScheme
-* BearerSecurityScheme
-* PSKSecurityScheme 
-* OAuth2SecurityScheme
+* BasicSecurityScheme   (todo)
+* DigestSecurityScheme  (todo)
+* APIKeySecurityScheme  (todo)
+* BearerSecurityScheme  (todo)
+* PSKSecurityScheme     (todo)
+* OAuth2SecurityScheme  (todo)
 
-Clients can connect to the API using one of these schemes.
+Clients can connect to the API using one of these schemes. 
 
+Support for identity verification is provided through JWS. A Hub that has enabled identity verification requires that all messages are published with a JWS signature using the public key that the Hub provided during provisioning. Consumers can verify the authenticity of the sender.
+
+Last, for messages with sensitive information, a publisher can choose to encrypt the message payload using JWE and the public key of the intended receiver. 
+
+The protocol binding for signing and encryption of messages over MQTT is not specified in the WoT standard. WoST applies this extension as optional to allow for backwards compatibility. See the Message format section for details.
 
 ## HUB MQTT API
 
@@ -31,6 +36,9 @@ The MQTT API is intended for live communication between Things, Services and Con
 * Consumer publishes an action request
 
 ### Provisioning
+
+A WoST compatible device must be provisioned using one of the client API's. When a device is provisioned by the Hub, they exchange credentials for secured connectivity and message exchange. The credentials are defined by the security schemes. Note that a device can manage multiple Things.
+
 
 > ### TBD
 

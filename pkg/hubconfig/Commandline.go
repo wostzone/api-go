@@ -26,9 +26,9 @@ func SetHubCommandlineArgs(config *HubConfig) {
 
 	flag.StringVar(&config.Messenger.CertFolder, "certFolder", config.Messenger.CertFolder, "Optional certificate `folder` for TLS")
 	flag.StringVar(&config.ConfigFolder, "configFolder", config.ConfigFolder, "Plugin configuration `folder`")
-	flag.StringVar(&config.Messenger.HostPort, "hostname", config.Messenger.HostPort, "Message bus address host:port")
+	flag.StringVar(&config.Messenger.Address, "address", config.Messenger.Address, "Message bus hostname or address")
+	flag.IntVar(&config.Messenger.Port, "port", config.Messenger.Port, "Message bus server port")
 	flag.StringVar(&config.Logging.LogFile, "logFile", config.Logging.LogFile, "Log to file")
-	flag.StringVar(&config.Messenger.Protocol, "protocol", string(config.Messenger.Protocol), "Message bus protocol: internal|mqtt")
 	flag.StringVar(&config.PluginFolder, "pluginFolder", config.PluginFolder, "Alternate plugin `folder`. Empty to not load plugins.")
 	flag.StringVar(&config.Logging.Loglevel, "logLevel", config.Logging.Loglevel, "Loglevel: {error|`warning`|info|debug}")
 }
