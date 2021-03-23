@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,5 +73,11 @@ func TestBadCert(t *testing.T) {
 	assert.Errorf(t, err, "Creating certificates should fail")
 	assert.Nilf(t, clientCertPEM, "Created client certificate")
 	assert.Nilf(t, clientKeyPEM, "Created client key")
+}
 
+func TestCreateCerts(t *testing.T) {
+	hostname := "localhost"
+	cwd, _ := os.Getwd()
+	certFolder := path.Join(cwd, "../../test/certs")
+	certsetup.CreateCertificates(hostname, certFolder)
 }

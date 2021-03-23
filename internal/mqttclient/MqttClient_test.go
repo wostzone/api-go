@@ -1,4 +1,4 @@
-package wostmqtt_test
+package mqttclient_test
 
 import (
 	"sync"
@@ -8,38 +8,48 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/wostzone/hubapi/pkg/wostmqtt"
+	"github.com/wostzone/hubapi/internal/mqttclient"
+	"github.com/wostzone/hubapi/pkg/certsetup"
 )
 
-const mqttServerHostPort = "localhost:8883"
-const caCertFile = "/etc/mosquitto/certs/mqtt_srv.crt"
-const clientID = "client5"
+// !!! USE THE MOSQUITTO CONFIGURATION FOR THIS TEST !!!
+// See /etc/mosquitto/conf.d/wost.conf
+const mqttTestServerHostPort = "localhost:8883"
+const mqttTestCaCertFile = "/etc/mosquitto/certs/" + certsetup.CaCertFile
+
+// const caCertFile = "/etc/mosquitto/certs/" + certsetup.ServerCertFile
 const TEST_TOPIC = "test"
 
 // These tests require an MQTT TLS server on localhost with TLS support
 
 func TestMqttConnect(t *testing.T) {
-	client := wostmqtt.NewMqttClient(mqttServerHostPort, caCertFile)
+	logrus.Infof("--- TestMqttConnect ---")
+
+	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
 	const timeout = 10
-	err := client.Connect(clientID, timeout)
+	err := client.Connect("", timeout)
 	assert.NoError(t, err)
 	// reconnect
-	err = client.Connect(clientID, timeout)
+	err = client.Connect("", timeout)
 	assert.NoError(t, err)
 	client.Disconnect()
 }
 
 func TestMqttNoConnect(t *testing.T) {
+	logrus.Infof("--- TestMqttNoConnect ---")
+
 	invalidHost := "nohost:1111"
-	client := wostmqtt.NewMqttClient(invalidHost, caCertFile)
+	client := mqttclient.NewMqttClient(invalidHost, mqttTestCaCertFile)
 	timeout := 5
 	require.NotNil(t, client)
-	err := client.Connect(clientID, timeout)
+	err := client.Connect("", timeout)
 	assert.Error(t, err)
 	client.Disconnect()
 }
 
 func TestMQTTPubSub(t *testing.T) {
+	logrus.Infof("--- TestMQTTPubSub ---")
+
 	var rx string
 	rxMutex := sync.Mutex{}
 	var msg1 = "Hello world"
@@ -47,8 +57,8 @@ func TestMQTTPubSub(t *testing.T) {
 	const timeout = 10
 	// certFolder := ""
 
-	client := wostmqtt.NewMqttClient(mqttServerHostPort, caCertFile)
-	err := client.Connect(clientID, timeout)
+	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
+	err := client.Connect("", timeout)
 	require.NoError(t, err)
 
 	client.Subscribe(TEST_TOPIC, func(channel string, msg []byte) {
@@ -72,7 +82,9 @@ func TestMQTTPubSub(t *testing.T) {
 }
 
 func TestMQTTMultipleSubscriptions(t *testing.T) {
-	client := wostmqtt.NewMqttClient(mqttServerHostPort, caCertFile)
+	logrus.Infof("--- TestMQTTMultipleSubscriptions ---")
+
+	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
 	var rx1 string
 	var rx2 string
 	rxMutex := sync.Mutex{}
@@ -82,7 +94,7 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 	const timeout = 10
 
 	// mqttMessenger := NewMqttMessenger(clientID, mqttCertFolder)
-	err := client.Connect(clientID, timeout)
+	err := client.Connect("", timeout)
 	require.NoError(t, err)
 	handler1 := func(channel string, msg []byte) {
 		rxMutex.Lock()
@@ -103,7 +115,8 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	rxMutex.Lock()
-	assert.Equalf(t, "", rx1, "Did not receive the message on handler 1")
+	// tbd
+	assert.Equalf(t, "", rx1, "Did not expect a message on handler 1")
 	assert.Equalf(t, msg1, rx2, "Did not receive the message on handler 2")
 	// after unsubscribe no message should be received by handler 1
 	rx1 = ""
@@ -120,16 +133,18 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 	rx2 = ""
 	rxMutex.Unlock()
 
-	client.Unsubscribe(TEST_TOPIC)
+	client.Subscribe(TEST_TOPIC, handler1)
 	err = client.Publish(TEST_TOPIC, []byte(msg2))
 	time.Sleep(100 * time.Millisecond)
 
 	rxMutex.Lock()
-	assert.Equalf(t, "", rx1, "Received a message on handler 1 after unsubscribe")
-	assert.Equalf(t, "", rx2, "Did not receive the message on handler 2")
+	assert.Equalf(t, msg2, rx1, "Did not receive a message on handler 1 after subscribe")
+	assert.Equalf(t, "", rx2, "Receive the message on handler 2")
 	rxMutex.Unlock()
 
 	// when unsubscribing without handler, all handlers should be unsubscribed
+	rx1 = ""
+	rx2 = ""
 	client.Subscribe(TEST_TOPIC, handler1)
 	client.Subscribe(TEST_TOPIC, handler2)
 	client.Unsubscribe(TEST_TOPIC)
@@ -145,10 +160,12 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 }
 
 func TestMQTTBadUnsubscribe(t *testing.T) {
-	client := wostmqtt.NewMqttClient(mqttServerHostPort, caCertFile)
+	logrus.Infof("--- TestMQTTBadUnsubscribe ---")
+
+	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
 	const timeout = 10
 
-	err := client.Connect(clientID, timeout)
+	err := client.Connect("", timeout)
 	require.NoError(t, err)
 
 	client.Unsubscribe(TEST_TOPIC)
@@ -156,8 +173,10 @@ func TestMQTTBadUnsubscribe(t *testing.T) {
 }
 
 func TestMQTTPubNoConnect(t *testing.T) {
+	logrus.Infof("--- TestMQTTPubNoConnect ---")
+
 	invalidHost := "localhost:1111"
-	client := wostmqtt.NewMqttClient(invalidHost, caCertFile)
+	client := mqttclient.NewMqttClient(invalidHost, mqttTestCaCertFile)
 	const timeout = 10
 	var msg1 = "Hello world 1"
 
@@ -170,7 +189,9 @@ func TestMQTTPubNoConnect(t *testing.T) {
 }
 
 func TestMQTTSubBeforeConnect(t *testing.T) {
-	client := wostmqtt.NewMqttClient(mqttServerHostPort, caCertFile)
+	logrus.Infof("--- TestMQTTSubBeforeConnect ---")
+
+	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
 	const timeout = 10
 	const msg = "hello 1"
 	var rx string
@@ -185,13 +206,49 @@ func TestMQTTSubBeforeConnect(t *testing.T) {
 	}
 	client.Subscribe(TEST_TOPIC, handler1)
 
-	err := client.Connect(clientID, timeout)
+	err := client.Connect("", timeout)
 	require.NoError(t, err)
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	err = client.Publish(TEST_TOPIC, []byte(msg))
 	require.NoError(t, err)
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
+
+	rxMutex.Lock()
+	assert.Equal(t, msg, rx)
+	rxMutex.Unlock()
+
+	client.Disconnect()
+}
+
+func TestSubscribeWildcard(t *testing.T) {
+	logrus.Infof("--- TestSubscribeWildcard ---")
+	const testTopic1 = "test/1/5"
+	const wildcardTopic = "test/+/#"
+
+	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
+	const timeout = 10
+	const msg = "hello 1"
+	var rx string
+	rxMutex := sync.Mutex{}
+	// mqttMessenger := NewMqttMessenger(clientID, mqttCertFolder)
+
+	handler1 := func(channel string, msg []byte) {
+		logrus.Infof("Received message on handler 1: %s", msg)
+		rxMutex.Lock()
+		defer rxMutex.Unlock()
+		rx = string(msg)
+	}
+	client.Subscribe(wildcardTopic, handler1)
+
+	// connect after subscribe uses resubscribe
+	err := client.Connect("", timeout)
+	require.NoError(t, err)
+	time.Sleep(100 * time.Millisecond)
+
+	err = client.Publish(testTopic1, []byte(msg))
+	require.NoError(t, err)
+	time.Sleep(100 * time.Millisecond)
 
 	rxMutex.Lock()
 	assert.Equal(t, msg, rx)

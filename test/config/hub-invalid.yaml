@@ -3,7 +3,8 @@
 # Message bus server
 messenger:
   certFolder: "/invalid/folder" # set to activate TLS
-  protocol: "" # smbus, MQTT, default smbus
+  address: "localhost"
+  port: 8883 # local mosquitto test server
   timeout: 1
 
 # Logging

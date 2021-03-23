@@ -35,7 +35,7 @@ type IConsumerClient interface {
 	//    thingID is the ID of the Thing whose TD is received
 	//    td is an unmarshalled JSON document containing the received Thing Description
 	//    senderID is the authenticated client ID of the sender
-	SubscribeTD(thingID string, handler func(thingID string, td map[string]interface{}, senderID string))
+	SubscribeToTD(thingID string, handler func(thingID string, td map[string]interface{}, senderID string))
 
 	// SubscribePropertyValues receives updates to Thing property values from the WoST Hub
 	//
@@ -44,7 +44,7 @@ type IConsumerClient interface {
 	//    thingID is the ID of the Thing whose values are received
 	//    values is an unmarshalled JSON document with property values: { "propname": "value", ...}
 	//    senderID is the authenticated client ID of the sender
-	SubscribePropertyValues(thingID string, handler func(thingID string, values map[string]interface{}, senderID string))
+	SubscribeToPropertyValues(thingID string, handler func(thingID string, values map[string]interface{}, senderID string))
 
 	// SubscribeEvents receives Thing events from the WoST hub.
 	//
@@ -53,5 +53,5 @@ type IConsumerClient interface {
 	//    thingID is the ID of the Thing whose event is received
 	//    event is an unmarshalled JSON document with event: {...}
 	//    senderID is the authenticated client ID of the sender
-	SubscribeEvent(thingID string, handler func(thingID string, event map[string]interface{}, senderID string))
+	SubscribeToEvents(thingID string, handler func(thingID string, event map[string]interface{}, senderID string))
 }

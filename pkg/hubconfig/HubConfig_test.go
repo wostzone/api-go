@@ -73,7 +73,7 @@ func TestLoadHubConfigYamlError(t *testing.T) {
 	err := hubconfig.LoadConfig(configFile, gc)
 	// Error should contain info on bad file
 	errTxt := err.Error()
-	assert.Equal(t, "yaml: line 10", errTxt[:13], "Expected line 10 to be bad")
+	assert.Equal(t, "yaml: line 11", errTxt[:13], "Expected line 11 to be bad")
 	assert.Error(t, err, "Configfile should not be found")
 }
 

@@ -1,4 +1,4 @@
-package wostmqtt
+package mqttclient
 
 import (
 	"crypto/tls"
@@ -24,7 +24,7 @@ const TLSPort = 8883
 // MqttClient client wrapper around pahoClient
 // This addresses problems with reconnect and auto resubscribe while using clean session
 type MqttClient struct {
-	// clientID string // unique ID of the client
+	clientID string // unique ID of the client (used for logging)
 	hostPort string // host:port of server to connect to
 	pubQos   byte
 	subQos   byte
@@ -43,13 +43,16 @@ type TopicSubscription struct {
 	handler   func(address string, message []byte)
 	handlerID reflect.Value
 	// token     pahomqtt.Token // for debugging
-	// client *MqttMessenger //
+	// client *MqttClient //
 }
 
 // Connect to the MQTT broker
-// If a previous connection exists then it is disconnected first.
-// serverAddr contains the hostname:port of the server
-// timeout in seconds after which to give up
+// If a previous connection exists then it is disconnected first. If no connection is possible
+// this keeps retrying until the timeout is expired. With each retry a backoff period
+// is increased until 120 seconds.
+//  clientID unique ID to connect as. max 23 characters according to MQTT v3.1 spec
+// leave empty for default hostname-timestamp
+//  timeout in seconds after which to give up. 0 to never give up.
 func (mqttClient *MqttClient) Connect(clientID string, timeout int) error {
 	// set config defaults
 	// ClientID defaults to hostname-secondsSinceEpoc
@@ -57,6 +60,7 @@ func (mqttClient *MqttClient) Connect(clientID string, timeout int) error {
 		hostName, _ := os.Hostname()
 		clientID = fmt.Sprintf("%s-%d", hostName, time.Now().Unix())
 	}
+	mqttClient.clientID = clientID
 
 	// close existing connection
 	if mqttClient.pahoClient != nil && mqttClient.pahoClient.IsConnected() {
@@ -78,13 +82,13 @@ func (mqttClient *MqttClient) Connect(clientID string, timeout int) error {
 	//opts.SetKeepAlive(60) // keepalive causes deadlock in v1.1.0. See github issue #126
 
 	opts.SetOnConnectHandler(func(client pahomqtt.Client) {
-		logrus.Warningf("MqttMessenger.onConnect: Connected to server at %s. Connected=%v. ClientId=%s",
+		logrus.Warningf("MqttClient.onConnect: Connected to server at %s. Connected=%v. ClientId=%s",
 			brokerURL, client.IsConnected(), clientID)
 		// Subscribe to addresss already registered by the app on connect or reconnect
 		mqttClient.resubscribe()
 	})
 	opts.SetConnectionLostHandler(func(client pahomqtt.Client, err error) {
-		logrus.Warningf("MqttMessenger.onConnectionLost: Disconnected from server %s. Error %s, ClientId=%s",
+		logrus.Warningf("MqttClient.onConnectionLost: Disconnected from server %s. Error %s, ClientId=%s",
 			brokerURL, err, clientID)
 	})
 	// if lastWillAddress != "" {
@@ -96,18 +100,18 @@ func (mqttClient *MqttClient) Connect(clientID string, timeout int) error {
 		rootCA = x509.NewCertPool()
 		caFile, err := ioutil.ReadFile(mqttClient.tlsCACertFile)
 		if err != nil {
-			logrus.Errorf("MqttMessenger.Connect: Unable to read CA certificate chain: %s", err)
+			logrus.Errorf("MqttClient.Connect: Unable to read CA certificate chain: %s", err)
 		}
 		rootCA.AppendCertsFromPEM([]byte(caFile))
 	}
 	opts.SetTLSConfig(&tls.Config{
 		InsecureSkipVerify: !mqttClient.tlsVerifyServerCert,
-		RootCAs:            rootCA, // include the zcas cert in the host root ca set
+		RootCAs:            rootCA, // include the CA cert in the host root ca set
 		// https://opium.io/blog/mqtt-in-go/
 		ServerName: "", // hostname on the server certificate. How to get this?
 	})
 
-	logrus.Infof("MqttMessenger.Connect: Connecting to MQTT server: %s with clientID %s"+
+	logrus.Infof("MqttClient.Connect: Connecting to MQTT server: %s with clientID %s"+
 		" AutoReconnect and CleanSession are set.",
 		brokerURL, clientID)
 
@@ -133,7 +137,7 @@ func (mqttClient *MqttClient) Connect(clientID string, timeout int) error {
 		}
 		retryDuration++
 
-		logrus.Errorf("MqttMessenger.Connect: Connecting to broker on %s failed: %s. retrying in %d seconds.",
+		logrus.Errorf("MqttClient.Connect: Connecting to broker on %s failed: %s. retrying in %d seconds.",
 			brokerURL, token.Error(), retryDelaySec)
 		sleepDuration := time.Duration(retryDelaySec)
 		retryDuration += int(sleepDuration)
@@ -154,7 +158,7 @@ func (mqttClient *MqttClient) Disconnect() {
 	mqttClient.updateMutex.Unlock()
 
 	if mqttClient.pahoClient != nil {
-		logrus.Warningf("MqttMessenger.Disconnect: Set state to disconnected and close connection")
+		logrus.Warningf("MqttClient.Disconnect: Client %s", mqttClient.clientID)
 		//messenger.publish("$state", "disconnected")
 		time.Sleep(time.Second / 10) // Disconnect doesn't seem to wait for all messages. A small delay ahead helps
 		mqttClient.pahoClient.Disconnect(10 * ConnectionTimeoutSec * 1000)
@@ -166,35 +170,35 @@ func (mqttClient *MqttClient) Disconnect() {
 }
 
 // Wrapper for message handling to support multiple subscribers to one topic
-func (mqttClient *MqttClient) onMessage(c pahomqtt.Client, msg pahomqtt.Message) {
-	topic := msg.Topic()
-	payload := msg.Payload()
+// func (mqttClient *MqttClient) onMessage(c pahomqtt.Client, msg pahomqtt.Message) {
+// 	topic := msg.Topic()
+// 	payload := msg.Payload()
 
-	logrus.Infof("MqttMessenger.onMessage. address=%s", topic)
-	subscription := mqttClient.subscriptions[topic]
-	if subscription == nil {
-		logrus.Errorf("onMessage: no subscription for topic %s", topic)
-		return
-	}
-	subscription.handler(topic, payload)
-}
+// 	logrus.Infof("MqttClient.onMessage. address=%s", topic)
+// 	subscription := mqttClient.subscriptions[topic]
+// 	if subscription == nil {
+// 		logrus.Errorf("onMessage: no subscription for topic %s", topic)
+// 		return
+// 	}
+// 	subscription.handler(topic, payload)
+// }
 
 // Publish a message to a topic address
 func (mqttClient *MqttClient) Publish(topic string, message []byte) error {
 	var err error
 
 	if mqttClient.pahoClient == nil || !mqttClient.pahoClient.IsConnected() {
-		logrus.Warnf("MqttMessenger.Publish: Unable to publish. No connection with server.")
+		logrus.Warnf("MqttClient.Publish: Unable to publish. No connection with server.")
 		return errors.New("no connection with server")
 	}
-	logrus.Infof("MqttMessenger.Publish []byte: topic=%s, qos=%d",
+	logrus.Infof("MqttClient.Publish []byte: topic=%s, qos=%d",
 		topic, mqttClient.pubQos)
 	token := mqttClient.pahoClient.Publish(topic, mqttClient.pubQos, false, message)
 
 	err = token.Error()
 	if err != nil {
 		// TODO: confirm that with qos=1 the message is sent after reconnect
-		logrus.Warnf("MqttMessenger.Publish: Error during publish on address %s: %v", topic, err)
+		logrus.Warnf("MqttClient.Publish: Error during publish on address %s: %v", topic, err)
 		//return err
 	}
 	return err
@@ -209,14 +213,23 @@ func (mqttClient *MqttClient) resubscribe() {
 	mqttClient.updateMutex.Lock()
 	defer mqttClient.updateMutex.Unlock()
 
-	logrus.Infof("MqttMessenger.resubscribe to %d addresess", len(mqttClient.subscriptions))
-	for topic := range mqttClient.subscriptions {
+	logrus.Infof("MqttClient.resubscribe to %d addresess", len(mqttClient.subscriptions))
+	for topic, subscription := range mqttClient.subscriptions {
 		// clear existing subscription in case it is still there
 		mqttClient.pahoClient.Unsubscribe(topic)
 
-		logrus.Infof("MqttMessenger.resubscribe: address %s", topic)
+		logrus.Debugf("MqttClient.resubscribe: address %s", topic)
 		// create a new variable to hold the subscription in the closure
-		mqttClient.pahoClient.Subscribe(topic, mqttClient.pubQos, mqttClient.onMessage)
+		mqttClient.pahoClient.Subscribe(
+			topic, mqttClient.pubQos,
+			func(c pahomqtt.Client, msg pahomqtt.Message) {
+				topic := msg.Topic()
+				payload := msg.Payload()
+
+				logrus.Infof("MqttClient.resubscribe.onMessage. address=%s", topic)
+				subscription.handler(topic, payload)
+			})
+
 		// token := messenger.pahoClient.Subscribe(newSubscr.topic, messenger.pubQos, newSubscr.onMessage)
 		//token := messenger.pahoClient.Subscribe(newSubscr.address, newSubscr.qos, func (c pahomqtt.Client, msg pahomqtt.Message) {
 		//logrus.Infof("mqtt.resubscribe.onMessage: address %s, subscription %s", msg.Topic(), newSubscr.address)
@@ -224,7 +237,7 @@ func (mqttClient *MqttClient) resubscribe() {
 		//})
 		// newSubscr.token = token
 	}
-	logrus.Infof("MqttMessenger.resubscribe complete")
+	logrus.Debugf("MqttClient.resubscribe complete")
 }
 
 // Subscribe to a address
@@ -239,25 +252,37 @@ func (mqttClient *MqttClient) Subscribe(
 		handler:   handler,
 		handlerID: handlerID,
 	}
-	logrus.Infof("MqttMessenger.Subscribe: topic %s, qos %d", topic, mqttClient.subQos)
+	logrus.Infof("MqttClient.Subscribe: topic %s, qos %d", topic, mqttClient.subQos)
 
 	mqttClient.updateMutex.Lock()
 	defer mqttClient.updateMutex.Unlock()
 
-	if mqttClient.subscriptions[topic] != nil {
-		logrus.Warningf("Subscribe: Existing subscription to %s is replaced", topic)
-	} else {
-		if mqttClient.pahoClient != nil {
-			mqttClient.pahoClient.Subscribe(topic, mqttClient.subQos, mqttClient.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
-		}
+	// if mqttClient.subscriptions[topic] != nil {
+	// 	logrus.Warningf("Subscribe: Existing subscription to %s is replaced", topic)
+	// } else {
+	if mqttClient.pahoClient != nil {
+		// save handler on the stack
+		subscribedHandler := handler
+		mqttClient.pahoClient.Subscribe(topic, mqttClient.subQos,
+			func(c pahomqtt.Client, msg pahomqtt.Message) {
+				topic := msg.Topic()
+				payload := msg.Payload()
+
+				logrus.Infof("MqttClient.Subscribe.onMessage. address=%s", topic)
+				subscribedHandler(topic, payload)
+			})
 	}
+	// }
 	mqttClient.subscriptions[topic] = subscription
 }
 
 // Unsubscribe a topic and handler
 // if handler is nil then all subscribers to the topic are removed
 func (mqttClient *MqttClient) Unsubscribe(topic string) {
+	logrus.Infof("MqttClient.Unsubscribe: topic %s", topic)
+
 	// messenger.publishMutex.Lock()
+
 	subscription := mqttClient.subscriptions[topic]
 	if subscription == nil {
 		// nothing to unsubscribe
@@ -265,11 +290,13 @@ func (mqttClient *MqttClient) Unsubscribe(topic string) {
 		return
 	}
 
-	mqttClient.pahoClient.Unsubscribe(topic)
-	mqttClient.subscriptions[topic] = nil
+	if mqttClient.pahoClient != nil {
+		mqttClient.pahoClient.Unsubscribe(topic)
+		mqttClient.subscriptions[topic] = nil
+	}
 }
 
-// NewMqttMessenger creates a new MQTT messenger instance
+// NewMqttClient creates a new MQTT messenger instance
 //  hostPort to connect to
 //  caCertFile must contain the server CA certificate filename
 func NewMqttClient(hostPort string, caCertFile string) *MqttClient {

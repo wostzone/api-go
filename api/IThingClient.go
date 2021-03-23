@@ -39,7 +39,7 @@ type IThingClient interface {
 	//     thingID whose action to initiate
 	//     action is an unmarshalled JSON document containing the action requests
 	//     senderID is the authenticated client ID of the sender
-	SubscribeToAction(thingID string, handler func(thingID string, action map[string]interface{}, senderID string))
+	SubscribeToActions(thingID string, handler func(thingID string, action map[string]interface{}, senderID string))
 
 	// SubscribeToConfig subscribes a handler to the request for configuration updates.
 	// This is intended for Things that have writable configuration defined in their TD

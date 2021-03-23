@@ -28,6 +28,7 @@ type test interface {
 }
 
 // HubConfig with hub configuration parameters
+// Intended for hub plugins to provide hub services
 type HubConfig struct {
 	Logging struct {
 		Loglevel   string `yaml:"logLevel"`   // debug, info, warning, error. Default is warning
@@ -35,13 +36,13 @@ type HubConfig struct {
 		TimeFormat string `yaml:"timeFormat"` // go default ISO8601 ("2006-01-02T15:04:05.000-0700")
 	} `yaml:"logging"`
 
-	// Messenger configuration of hub plugin messaging
+	// Configuration of hub client messaging
 	Messenger struct {
-		Address    string `yaml:"address"`              // address with hostname or ip of the message bus
-		CertFolder string `yaml:"certFolder,omitempty"` // location of TLS certificates. Default is ./certs
-		Port       int    `yaml:"port,omitempty"`       // optional port, default is 8883 for MQTT TLS
-		Signing    bool   `yaml:"signing,omitempty"`    // Message signing to be used by all publishers, default is false
-		Timeout    int    `yaml:"timeout,omitempty"`    // Client connection timeout in seconds. 0 for indefinite
+		Address    string `yaml:"address"`           // address with hostname or ip of the message bus
+		Port       int    `yaml:"port,omitempty"`    // optional port, default is 8883 for MQTT TLS
+		CertFolder string `yaml:"certFolder"`        // Folder containing certificates, default is {home}/certs
+		Signing    bool   `yaml:"signing,omitempty"` // Message signing to be used by all publishers, default is false
+		Timeout    int    `yaml:"timeout,omitempty"` // Client connection timeout in seconds. 0 for indefinite
 	} `yaml:"messenger"`
 
 	Home         string   `yaml:"home"`         // application home directory. Default is parent of executable.
@@ -81,6 +82,10 @@ func CreateDefaultHubConfig(homeFolder string) *HubConfig {
 	}
 	// config.Messenger.CertsFolder = path.Join(homeFolder, "certs")
 	config.Messenger.CertFolder = path.Join(homeFolder, DefaultCertsFolder)
+	// config.Messenger.CaCertFile = certsetup.CaCertFile
+	// config.Messenger.ServerCertFile = certsetup.ServerCertFile
+	// config.Messenger.ClientCertFile = certsetup.ClientCertFile
+	// config.Messenger.ClientKeyFile = certsetup.ClientKeyFile
 	config.Messenger.Address = "localhost"
 	config.Messenger.Port = DefaultPort
 	config.Logging.Loglevel = "warning"

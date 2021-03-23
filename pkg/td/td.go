@@ -2,8 +2,6 @@ package td
 
 import "github.com/sirupsen/logrus"
 
-type DynamicThingDescription map[string]interface{}
-
 // tbd json-ld parsers:
 // Most popular; https://github.com/xeipuuv/gojsonschema
 // Other:  https://github.com/piprate/json-gold
@@ -64,8 +62,8 @@ func SetTdForms(td map[string]interface{}, formList []map[string]interface{}) {
 }
 
 // CreateTD creates a new Thing Description document
-func CreateTD(id string) DynamicThingDescription {
-	td := make(DynamicThingDescription, 0)
+func CreateTD(id string) map[string]interface{} {
+	td := make(map[string]interface{}, 0)
 	td["@context"] = "http://www.w3.org/ns/td"
 	td["id"] = id
 	td["properties"] = make(map[string]interface{})

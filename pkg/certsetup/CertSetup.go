@@ -9,8 +9,10 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"io/ioutil"
 	"math/big"
 	"net"
+	"path"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -22,7 +24,7 @@ const certDurationYears = 10
 
 // Standard client and server certificate filenames
 const (
-	CaCertFile     = "ca.crt"
+	CaCertFile     = "ca.crt" // CA that signed the server and client certificates
 	CaKeyFile      = "ca.key"
 	ServerCertFile = "hub.crt"
 	ServerKeyFile  = "hub.key"
@@ -231,5 +233,29 @@ func CreateClientCert(caCertPEM []byte, caKeyPEM []byte, hostname string) (pkPEM
 	})
 
 	return clientCertPEMBuffer.Bytes(), clientKeyPEMBuffer.Bytes(), nil
+}
 
+// Create the CA, server and client certificates into the given folder
+func CreateCertificates(hostname string, certFolder string) error {
+	caCertPEM, caKeyPEM := CreateWoSTCA()
+	serverCertPEM, serverKeyPEM, _ := CreateHubCert(caCertPEM, caKeyPEM, hostname)
+	clientCertPEM, clientKeyPEM, _ := CreateClientCert(caCertPEM, caKeyPEM, hostname)
+
+	caCertPath := path.Join(certFolder, CaCertFile)
+	caKeyPath := path.Join(certFolder, CaKeyFile)
+	serverCertPath := path.Join(certFolder, ServerCertFile)
+	serverKeyPath := path.Join(certFolder, ServerKeyFile)
+	clientCertPath := path.Join(certFolder, ClientCertFile)
+	clientKeyPath := path.Join(certFolder, ClientKeyFile)
+
+	err := ioutil.WriteFile(caKeyPath, caKeyPEM, 0600)
+	if err != nil {
+		logrus.Fatalf("CreateCertificates failed writing. Unable to continue: %s", err)
+	}
+	ioutil.WriteFile(caCertPath, caCertPEM, 0644)
+	ioutil.WriteFile(serverKeyPath, serverKeyPEM, 0600)
+	ioutil.WriteFile(serverCertPath, serverCertPEM, 0644)
+	ioutil.WriteFile(clientKeyPath, clientKeyPEM, 0600)
+	ioutil.WriteFile(clientCertPath, clientCertPEM, 0644)
+	return nil
 }

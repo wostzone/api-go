@@ -2,9 +2,10 @@
 
 # Message bus server
 messenger:
-  #certsFolder: "./certs" # set to activate TLS
+  #certFolder: "./certs" # set to activate TLS
   #protocol: "" # internal, MQTT, default internal
-  #hostname: "localhost:9678" # hostname:port or ip:port to listen on of message bus
+  #address: "localhost" # hostname or address to listen on
+  #port: 9678
   # the next line intentionally causes an error 
   -brokenyamlfile
   timeout: 1

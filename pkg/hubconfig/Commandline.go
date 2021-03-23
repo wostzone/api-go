@@ -33,11 +33,13 @@ func SetHubCommandlineArgs(config *HubConfig) {
 	flag.StringVar(&config.Logging.Loglevel, "logLevel", config.Logging.Loglevel, "Loglevel: {error|`warning`|info|debug}")
 }
 
-// SetupConfig contains the boilerplate to load the hub and plugin configuration files.
-// parse the commandline and set the plugin logging configuration.
-// The caller can add custom commandline options beforehand using the flag package.
+// LoadPluginConfig loads the hub and plugin configuration
+// This uses the -home and -c commandline arguments commands without the
+// flag package.
+// Intended for plugins or Hub apps that have their own commandlines but
+// still need to use the Hub's base configuration.
 //
-// The default hub config filename is 'hub.yaml' (const HubConfigName)
+// // The default hub config filename is 'hub.yaml' (const HubConfigName)
 // The plugin configuration is the {pluginName}.yaml. If no pluginName is given it is ignored.
 // The plugin logfile is stored in the hub logging folder using the pluginName.log filename
 // This loads the hub commandline arguments with two special considerations:
@@ -52,7 +54,7 @@ func SetHubCommandlineArgs(config *HubConfig) {
 //     The plugin config file is optional. Sensible defaults will be used if not present.
 // pluginConfig is the configuration to load. nil to only load the hub config.
 // Returns the hub configuration and error code in case of error
-func SetupConfig(homeFolder string, pluginName string, pluginConfig interface{}) (*HubConfig, error) {
+func LoadPluginConfig(homeFolder string, pluginName string, pluginConfig interface{}) (*HubConfig, error) {
 	args := os.Args[1:]
 	if homeFolder == "" {
 		// Option --home overrides the default home folder. Intended for testing.
@@ -103,9 +105,22 @@ func SetupConfig(homeFolder string, pluginName string, pluginConfig interface{})
 			// return hubConfig, err3
 		}
 	}
+	return hubConfig, nil
+}
+
+// LoadCommandlineConfig loads the hub and plugin configurations (See LoadPluginConfig)
+// and applies commandline  parameters to allow modifying this configuration from the
+// commandline.
+// Returns the hub configuration and error code in case of error
+func LoadCommandlineConfig(homeFolder string, pluginName string, pluginConfig interface{}) (*HubConfig, error) {
+	hubConfig, err := LoadPluginConfig(homeFolder, pluginName, pluginConfig)
+	if err != nil {
+		return hubConfig, err
+	}
+
 	SetHubCommandlineArgs(hubConfig)
 	// catch parsing errors, in case flag.ErrorHandling = flag.ContinueOnError
-	err := flag.CommandLine.Parse(os.Args[1:])
+	err = flag.CommandLine.Parse(os.Args[1:])
 
 	// Second validation pass in case commandline argument messed up the config
 	if err == nil {
