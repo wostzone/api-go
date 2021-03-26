@@ -27,6 +27,8 @@ type MqttHubClient struct {
 
 // Start the client connection
 func (client *MqttHubClient) Start(senderVerification bool) error {
+	logrus.Infof("Starting MQTT Hub client. Connecting to '%s'. CaCertFile '%s'",
+		client.mqttClient.hostPort, client.mqttClient.tlsCACertFile)
 	client.senderVerification = senderVerification
 	err := client.mqttClient.Connect(client.clientID, client.timeoutSec)
 	return err
@@ -38,15 +40,16 @@ func (client *MqttHubClient) Stop() {
 }
 
 // PublishAction publish a Thing action request to the Hub
-func (client *MqttHubClient) PublishAction(thingID string, action map[string]interface{}) error {
+func (client *MqttHubClient) PublishAction(thingID string, name string, params map[string]interface{}) error {
 	topic := strings.ReplaceAll(api.TopicAction, "{id}", thingID)
-	message, err := json.Marshal(action)
+	actions := map[string]interface{}{name: params}
+	message, err := json.Marshal(actions)
 	err = client.mqttClient.Publish(topic, message)
 	return err
 }
 
 // PublishConfig publish a Thing configuration request to the Hub
-func (client *MqttHubClient) PublishConfig(thingID string, values map[string]interface{}) error {
+func (client *MqttHubClient) PublishConfigRequest(thingID string, values map[string]interface{}) error {
 	topic := strings.ReplaceAll(api.TopicSetConfig, "{id}", thingID)
 	message, err := json.Marshal(values)
 	err = client.mqttClient.Publish(topic, message)
@@ -73,7 +76,7 @@ func (client *MqttHubClient) PublishPropertyValues(thingID string, values map[st
 
 // PublishTD publish a Thing description to the WoST hub
 // Intended to by used by a Thing to publish an update to its TD
-func (client *MqttHubClient) PublishTD(thingID string, td map[string]interface{}) error {
+func (client *MqttHubClient) PublishTD(thingID string, td api.ThingTD) error {
 	topic := strings.ReplaceAll(api.TopicThingTD, "{id}", thingID)
 	message, _ := json.Marshal(td)
 	err := client.mqttClient.Publish(topic, message)
@@ -104,19 +107,24 @@ func (client *MqttHubClient) Subscribe(
 
 // SubscribeToAction subscribes a handler to requested actions.
 func (client *MqttHubClient) SubscribeToActions(
-	thingID string, handler func(thingID string, action map[string]interface{}, senderID string)) {
+	thingID string,
+	handler func(thingID string, name string, params map[string]interface{}, senderID string)) {
 
 	topic := strings.ReplaceAll(api.TopicAction, "{id}", thingID)
 	// local copy of arguments
 	subscribedThingID := thingID
 	subscribedHandler := handler
+
 	client.mqttClient.Subscribe(topic, func(address string, message []byte) {
 		// FIXME: determine sender and format for action message
 		sender := ""
-		action := make(map[string]interface{})
-		err := json.Unmarshal(message, &action)
+		actions := make(map[string]interface{})
+		err := json.Unmarshal(message, &actions)
 		if err == nil {
-			subscribedHandler(subscribedThingID, action, sender)
+			for name, params := range actions {
+				actionParam := params.(map[string]interface{})
+				subscribedHandler(subscribedThingID, name, actionParam, sender)
+			}
 		} else {
 			logrus.Warningf("Message on topic '%s' not JSON", topic)
 		}
@@ -182,7 +190,7 @@ func (client *MqttHubClient) SubscribeToPropertyValues(
 
 // SubscribeTD subscribes to receive updates to TDs from the WoST Hub
 func (client *MqttHubClient) SubscribeToTD(
-	thingID string, handler func(thingID string, td map[string]interface{}, senderID string)) {
+	thingID string, handler func(thingID string, thingTD api.ThingTD, senderID string)) {
 	topic := strings.ReplaceAll(api.TopicThingTD, "{id}", thingID)
 	// local copy of arguments
 	subscribedThingID := thingID

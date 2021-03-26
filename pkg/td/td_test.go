@@ -14,44 +14,58 @@ func TestCreateTD(t *testing.T) {
 
 	// Set version
 	versions := map[string]string{"Software": "v10.1", "Hardware": "v2.0"}
-	td.SetTdVersion(thing, versions)
+	td.SetThingVersion(thing, versions)
 
 	// Define TD property
-	prop := td.CreateProperty("Prop1", "First property", false)
+	prop := td.CreateTDProperty("Prop1", "First property", td.PropertyTypeSensor)
 	enumValues := make([]string, 0) //{"value1", "value2"}
-	td.SetPropertyEnum(prop, enumValues)
-	td.SetPropertyUnit(prop, "C")
-	td.SetPropertyTypeInteger(prop, 1, 10)
-	td.SetPropertyTypeNumber(prop, 1, 10)
-	td.SetPropertyTypeString(prop, 1, 10)
-	td.SetPropertyTypeObject(prop, nil)
-	td.SetPropertyTypeArray(prop, 3, 10)
-	td.AddTdProperty(thing, "prop1", prop)
+	td.SetTDPropertyEnum(prop, enumValues)
+	td.SetTDPropertyUnit(prop, "C")
+	td.SetTDPropertyDataTypeInteger(prop, 1, 10)
+	td.SetTDPropertyDataTypeNumber(prop, 1, 10)
+	td.SetTDPropertyDataTypeString(prop, 1, 10)
+	td.SetTDPropertyDataTypeObject(prop, nil)
+	td.SetTDPropertyDataTypeArray(prop, 3, 10)
+	td.AddTDProperty(thing, "prop1", prop)
 	// invalid prop should not blow up
-	td.AddTdProperty(thing, "prop2", nil)
+	td.AddTDProperty(thing, "prop2", nil)
 
 	// Define event
-	ev1 := td.CreateEvent("ev1", "First event")
-	td.AddTdEvent(thing, "ev1", ev1)
+	ev1 := td.CreateTDEvent("ev1", "First event")
+	td.AddTDEvent(thing, "ev1", ev1)
 	// invalid event should not blow up
-	td.AddTdEvent(thing, "ev1", nil)
+	td.AddTDEvent(thing, "ev1", nil)
+
+	// Set error status
+	td.SetThingErrorStatus(thing, "there is an error")
 
 	// Define action
-	ac1 := td.CreateAction("action1", "First action")
-	actionProp := td.CreateAction("channel", "Select channel")
+	action1 := td.CreateTDAction("setChannel", "Change the channel")
+	actionProp := td.CreateTDProperty("channel", "Select channel", "input")
 	required := []string{"channel"}
-	td.SetActionInput(ac1, "string", actionProp, required)
-	td.SetActionOutput(ac1, "string")
+	td.SetTDActionInput(action1, "string", actionProp, required)
+	td.SetTDActionOutput(action1, "string")
 
-	td.AddTdAction(thing, "action1", ac1)
+	td.AddTDAction(thing, "action1", action1)
 	// invalid action should not blow up
-	td.AddTdAction(thing, "action1", nil)
+	td.AddTDAction(thing, "action1", nil)
 
 	// Define form
-	f1 := td.CreateForm("form1", "", "application/json", "GET")
+	f1 := td.CreateTDForm("form1", "", "application/json", "GET")
 	formList := make([]map[string]interface{}, 0)
 	formList = append(formList, f1)
-	td.SetTdForms(thing, formList)
+	td.SetTDForms(thing, formList)
 	// invalid form should not blow up
-	td.SetTdForms(thing, nil)
+	td.SetTDForms(thing, nil)
+}
+
+func TestCreateAction(t *testing.T) {
+	thing := td.CreateTDAction("Action1", "Do stuff")
+	assert.NotNil(t, thing)
+}
+
+func TestCreateActionRequest(t *testing.T) {
+	param1 := map[string]interface{}{}
+	thing := td.CreateActionRequest("Action1", param1)
+	assert.NotNil(t, thing)
 }

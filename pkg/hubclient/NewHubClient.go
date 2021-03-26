@@ -16,7 +16,7 @@ import (
 //   caCertFile CA certificate for verifying the TLS connections
 //   clientID to identify as. Leave empty to use hostname-timestamp
 //   credentials with secret to verify the identity
-func NewConsumerClient(hostPort string, caCertFile string, clientID string, credentials string) api.IConsumerClient {
+func NewHubClient(hostPort string, caCertFile string, clientID string, credentials string) api.IHubClient {
 	client := mqttclient.NewMqttHubClient(hostPort, caCertFile, clientID, credentials)
 	return client
 }
@@ -31,16 +31,6 @@ func NewPluginClient(clientID string, hubConfig *hubconfig.HubConfig) api.IHubCl
 	hostPort := fmt.Sprintf("%s:%d", hubConfig.Messenger.Address, hubConfig.Messenger.Port)
 	caCertFile := path.Join(hubConfig.Messenger.CertsFolder, certsetup.CaCertFile)
 	credentials := "" // todo
-	client := mqttclient.NewMqttHubClient(hostPort, caCertFile, clientID, credentials)
-	return client
-}
-
-// NewThingClient creates a new hub connection for Things
-//   hostPort address and port to connect to
-//   caCertFile CA certificate for verifying the TLS connections
-//   clientID to identify as. Leave empty to use hostname-timestamp
-//   credentials with secret to verify the identity
-func NewThingClient(hostPort string, caCertFile string, clientID string, credentials string) api.IThingClient {
 	client := mqttclient.NewMqttHubClient(hostPort, caCertFile, clientID, credentials)
 	return client
 }

@@ -1,4 +1,4 @@
-// Package hubapi with messaging topics to connect to the message bus
+// Package api with messaging topics for the MQTT protocol binding
 package api
 
 // TopicRoot is the base of the topic
@@ -13,7 +13,7 @@ const TopicThingPropertyValues = TopicRoot + "/{id}/values"
 // TopicThingEvent topic for thing publishing its Thing events
 const TopicThingEvent = TopicRoot + "/{id}/event"
 
-// TopicSetConfig topic request to update Thing configuration
+// TopicSetConfig topic request to update Thing configuration attributes
 const TopicSetConfig = TopicRoot + "/{id}/config"
 
 // TopicAction topic request to start action

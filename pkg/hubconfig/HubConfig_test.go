@@ -101,7 +101,7 @@ func TestLoadHubConfigBadFolders(t *testing.T) {
 	err = hubconfig.ValidateConfig(&gc2)
 	assert.Error(t, err)
 	gc2 = *gc
-	gc2.PluginFolder = "./doesntexist"
-	err = hubconfig.ValidateConfig(&gc2)
-	assert.Error(t, err)
+	// gc2.PluginFolder = "./doesntexist"
+	// err = hubconfig.ValidateConfig(&gc2)
+	// assert.Error(t, err)
 }

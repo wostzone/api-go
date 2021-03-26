@@ -40,7 +40,7 @@ type HubConfig struct {
 	Messenger struct {
 		Address     string `yaml:"address"`           // address with hostname or ip of the message bus
 		Port        int    `yaml:"port,omitempty"`    // optional port, default is 8883 for MQTT TLS
-		CertsFolder string `yaml:"certFolder"`        // Folder containing certificates, default is {home}/certs
+		CertsFolder string `yaml:"certsFolder"`       // Folder containing certificates, default is {home}/certs
 		Signing     bool   `yaml:"signing,omitempty"` // Message signing to be used by all publishers, default is false
 		Timeout     int    `yaml:"timeout,omitempty"` // Client connection timeout in seconds. 0 for indefinite
 	} `yaml:"messenger"`
@@ -136,13 +136,13 @@ func ValidateConfig(config *HubConfig) error {
 		logrus.Errorf("TLS certificate folder '%s' not found\n", config.Messenger.CertsFolder)
 		return err
 	}
-	// Pluginfolder is either empty or must exist
-	if config.PluginFolder != "" {
-		if _, err := os.Stat(config.PluginFolder); os.IsNotExist(err) {
-			logrus.Errorf("Plugins folder '%s' not found\n", config.PluginFolder)
-			return err
-		}
-	}
+	// // Pluginfolder is either empty or must exist
+	// if config.PluginFolder != "" {
+	// 	if _, err := os.Stat(config.PluginFolder); os.IsNotExist(err) {
+	// 		logrus.Warningf("Plugins folder '%s' not found.\n", config.PluginFolder)
+	// 		return err
+	// 	}
+	// }
 
 	// Address must exist
 	if config.Messenger.Address == "" {

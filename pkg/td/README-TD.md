@@ -23,9 +23,7 @@ A datetime format passed to WoST will be retained unchanged.
 
 ## Links
 
-Links are not support in WoST as they conflict with the paradigm that "Things are not servers".
-
-If a Thing does include a link then it is retained.
+Things can not have Links in WoST as they conflict with the paradigm that "Things are not servers". However, a Hub/Intermediary can add links that point to the Hub.
 
 
 ## Forms
@@ -34,19 +32,6 @@ The WoT specification for a [Form](https://www.w3.org/TR/2020/WD-wot-thing-descr
 
 In the TD specification, Forms define how to connect to the Thing. In WOST, this connection takes place via the Hub that represents the Thing.
 
-
-
-## Security
-Spec: security is defined as a SecuritySchema or Array of SecuritySchema
-WoST: security is defined as an array of SecuritySchema
-
-Rational: In a strongly type lanugage a field can only be of a single type. Since multiple security schemas are common, WoST only accepts an array.
-
-### SecuritySchema '@type'
-Spec: @type is defined as string or array of string
-WoST: @type is defined as a string
-
-Rational: In a strongly type lanugage a field can only be of a single type. Since most examples use a single type, only a single type is supported.
 
 ### SecuritySchema 'scheme' (1)
 Spec: any type, one of ...
@@ -69,7 +54,7 @@ Issue is that this looks like a string but could be one of multiple structs.
 
 # WoST REST API
 
-WoST compliant Things do not implement servers. All interaction takes place via the WoST secured hub which acts as an intermediary. Other than that the REST API that consumers use to access Web Things follows the description in [Mozilla's Web Thing REST API](https://iot.mozilla.org/wot/#web-thing-rest-api).
+WoST compliant Things do not implement servers. All interaction takes place via the WoST secured hub which acts as an intermediary. Other than that the REST API that consumers use to access Web Things follows the description in [http-api.md](https://github.com/wostzone/hubapi-go/docs/http-api.md) which is based on Mozilla's Web Thing REST API](https://iot.mozilla.org/wot/#web-thing-rest-api).
 
 The address of the Thing is that of the hub as follows:
 
@@ -77,12 +62,14 @@ The address of the Thing is that of the hub as follows:
 GET https://hub/things/{thingID}[/...]
 ```
 
-Note that this specification often assumes or suggests that Things are directly accessed, which is not allowed in WoST. Therefore the implementation of this API in WoST MUST follow the following rules:
+Note1: the Mozilla specification often assumes or suggests that Things are directly accessed, which is not allowed in WoST. Therefore the implementation of this API in WoST MUST follow the following rules:
 1. The Thing address is that of the hub it is connected to.
 2. The full thing ID must be included in the API. The examples says 'lamp' where a Thing ID is a URN: "urn:zone:publisher:name" for example.
 3. The hub will update action href fields to point to the hub. 
 
-The Mozilla API does not support queries.
+Note2: The Mozilla API does not support queries.
+
+Note3:the hubapi-go package provides a client implementation using MQTT. This is the most efficient way to communicate with the Hub. A http protocol binding for 3rd party clients is planned for the Hub.
 
 # WoST WebSocket API
 
@@ -96,6 +83,9 @@ GET wss://hub/things/{thingID}
 
 Where thingID is the full URI of the thing as defined in [Thing id](https://www.w3.org/TR/2020/WD-wot-thing-description11-20201124/#thing)
 
+Note:the hubapi-go package provides a client implementation using MQTT. This is the most efficient way to communicate with the Hub.  A http protocol binding for 3rd party clients is planned for the Hub.
+
+
 # Thing IDs
 
 Note: In WoST the ID of a Thing can be modified by the hub if the TD is received from an intermediary to reflect the domain of the Thing. 
@@ -106,3 +96,8 @@ This will avoid naming collision on bob.com by other hubs that have Things with 
 
 The Mozilla API does not support queries.
 
+## TD Property Types
+
+Thing properties can be used to describe sensors, actuators, internal attributes, internal state, and internal configuration. AT the time of writing there is no established convention on how to determine which one a property describes.
+
+The '@type' attribute is used to identify the type of property (different from the data type), as suggested by @sebastiankb in this discussion: https://github.com/w3c/wot-thing-description/issues/1079. Property types are defined in td/property.go, eg: "sensor", "actuator", "configuration", "state", "attr", "input", "output" where configuration is the only writable attribute, state reflects the internal device state and can change in runtime, and attr is an static descriptive attribute such as vendor, version, and such.

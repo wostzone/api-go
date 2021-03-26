@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/wostzone/hubapi/api"
 	"github.com/wostzone/hubapi/internal/mqttclient"
 	"github.com/wostzone/hubapi/pkg/td"
 )
@@ -18,14 +19,16 @@ func TestPublishAction(t *testing.T) {
 
 	credentials := ""
 	thingID := "thing1"
-	var rx map[string]interface{}
-
-	action1 := map[string]interface{}{"actionName": "actionValue"}
+	var rxName string
+	var rxParams map[string]interface{}
+	actionName := "action1"
+	actionInput := map[string]interface{}{"input1": "inputValue"}
 	consumerClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
 	thingClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	thingClient.SubscribeToActions(thingID, func(thingID string, action map[string]interface{}, sender string) {
+	thingClient.SubscribeToActions(thingID, func(thingID string, name string, params map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishAction: Received action of Thing %s from client %s", thingID, sender)
-		rx = action
+		rxName = name
+		rxParams = params
 	})
 
 	err := consumerClient.Start(false)
@@ -34,12 +37,13 @@ func TestPublishAction(t *testing.T) {
 
 	time.Sleep(time.Millisecond)
 
-	err = consumerClient.PublishAction(thingID, action1)
+	err = consumerClient.PublishAction(thingID, actionName, actionInput)
 	assert.NoError(t, err)
 
 	// TODO, check if it was received by the Thing
 	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, action1["actionName"], rx["actionName"])
+	assert.Equal(t, actionName, rxName)
+	assert.Equal(t, actionInput, rxParams)
 
 	thingClient.Stop()
 	consumerClient.Stop()
@@ -70,7 +74,7 @@ func TestPublishConfig(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	err = consumerClient.PublishConfig(thingID, config1)
+	err = consumerClient.PublishConfigRequest(thingID, config1)
 	assert.NoError(t, err)
 
 	// TODO, check if it was received by the Thing
@@ -155,7 +159,7 @@ func TestPublishTD(t *testing.T) {
 	consumerClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
 	err = consumerClient.Start(false)
 	assert.NoError(t, err)
-	consumerClient.SubscribeToTD(thingID, func(thingID string, thing map[string]interface{}, sender string) {
+	consumerClient.SubscribeToTD(thingID, func(thingID string, thing api.ThingTD, sender string) {
 		logrus.Infof("TestPublishTD: Received TD of Thing %s from client %s", thingID, sender)
 		rxTd = thing
 	})

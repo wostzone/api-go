@@ -25,7 +25,7 @@ Last, for messages with sensitive information, a publisher can choose to encrypt
 
 The protocol binding for signing and encryption of messages over MQTT is not specified in the WoT standard. WoST applies this extension as optional to allow for backwards compatibility. See the Message format section for details.
 
-## HUB MQTT API
+## HUB MQTT API Messages 
 
 The MQTT API is intended for live communication between Things, Services and Consumers. 
 
@@ -40,7 +40,7 @@ The MQTT API is intended for live communication between Things, Services and Con
 A WoST compatible device must be provisioned using one of the client API's. When a device is provisioned by the Hub, they exchange credentials for secured connectivity and message exchange. The credentials are defined by the security schemes. Note that a device can manage multiple Things.
 
 
-> ### TBD
+> #### TBD
 
 
 ### Thing Publishes a Thing Description Document
@@ -57,15 +57,21 @@ Thing publish a Thing Description Document to subscribers
 
 Consumers can subscribe to this topic or the 'things/+/td' topic to receive TDs as they are published.
 
-### Thing Publishes Update To Their Property Values 
+
+### Thing Publishes Update To Property Values
+
+**Note1: The WoT TD specification does not differentiate between sensor/actuator, configuration and status properties. There are several options to address this:**
+* Option 1. Each property has an attribute describing the property category: sensor, actuator, status, configuration
+* Option 2. Use only 4 properties in the WoST TD: sensors, actuators, status, configuration. Each of these properties is an object that contains properties for their respective attributes.
+
+Since option 1 keeps the API the smallest. The solution chosen is to use the 'category' attribute in a property definition and not to add separate API's for sensors, actuators, configuration, and status.
 
 Notify consumers that one or more Thing property values are updated. 
 
-* Note1: that the Mozilla API uses the things/{id}/properties address.
-* Note2: the final topic is still tbd, should this use 'properties' or 'values'?
-
+> ### Values Message
 > Topic: things/{id}/values
-> Content: 
+> 
+> Contains the values of changed TD properties:
 > ```json
 > {
 >    "{property1}": {value1}
@@ -79,19 +85,21 @@ Consumers can subscribe to a this topic or the 'things/+/values' wildcard topic 
 
 Notify consumers of one or more events that have happened on a Thing.
 
+> ### Events Message
 > Topic: things/{id}/events
-> ```json
-> Content:
-> {
->   "event1": {
->     "data": {value},
->     "timestamp": {iso8601 timestamp},
->   },
->    ...
-> }
-> ```
+> 
+> Contains the values of the TD 'events' object properties:
+>```json
+>{
+>  "event1": {
+>    "value": {value},
+>    "timestamp": {iso8601 timestamp},
+>  },
+>   ...
+>}
+>```
 
-### Consumer Publishes Update To Thing Configuration Values
+### Consumer Request Updates To Thing Configuration Values
 
 Consumer request that a Thing updates its configuration property value(s). Note that actuator values are updated through actions.
 
@@ -116,7 +124,7 @@ Things subscribe to this address to receive the action requests. If successful t
 > ```json
 > Content:
 > {
->   "event1": {
+>   "action1": {
 >     "data": {value},
 >     "timestamp": {iso8601 timestamp},
 >   },

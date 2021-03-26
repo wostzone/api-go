@@ -1,14 +1,17 @@
-// Package api with consumer client library interface definition
+// Package api with hub client library interface definition
 package api
 
 // Message types to receive
 const (
 	MessageTypeAction = "action"
-	MessageTypeConfig = "config"
+	MessageTypeConfig = "config" // update property config
 	MessageTypeEvent  = "event"
 	MessageTypeTD     = "td"
-	MessageTypeValues = "values"
+	MessageTypeValues = "values" // receive property values
 )
+
+// ThingTD contains the Thing Description document
+type ThingTD map[string]interface{}
 
 // IHubClient interface describing methods to connect to the Hub using one of
 // the protocol bindings.
@@ -27,16 +30,16 @@ type IHubClient interface {
 	// This is intended for consumers that want to control a Thing. The consumer must have
 	// sufficient authorization otherwise this request is ignored.
 	//  thingID is the unique ID of the Thing whose action is published
-	//  action is an object containing the action to request
-	//    senderID is the authenticated client ID of the sender
-	PublishAction(thingID string, action map[string]interface{}) error
+	//  action is an object containing the action to request with optional parameters
+	//
+	PublishAction(thingID string, action string, data map[string]interface{}) error
 
-	// PublishConfig requests a configuration update from a Thing.
+	// PublishConfigRequest requests a configuration update from a Thing.
 	// This is intended for consumers that want to configure a Thing. The consumer must have
 	// sufficient authorization otherwise this request is ignored.
 	//  thingID is the unique ID of the Thing to configure
-	//  config is an object containing the configuration request values
-	PublishConfig(thingID string, config map[string]interface{}) error
+	//  request is an object containing the configuration request values
+	PublishConfigRequest(thingID string, request map[string]interface{}) error
 
 	// PublishEvent publish a Thing event to the WoST hub.
 	// This is intended for use by WoST Things and Hub plugins to notify consumers of an event.
@@ -54,8 +57,8 @@ type IHubClient interface {
 	// PublishTD publish a WoT Thing Description to the WoST hub
 	// This is intended for use by WoST Things and Hub plugins to notify consumers of the existance of a Thing
 	//  thingID is the unique ID of the Thing whose TD is published
-	//  td is an object containing the Thing Description
-	PublishTD(thingID string, td map[string]interface{}) error
+	//  td is an map containing the Thing Description
+	PublishTD(thingID string, td ThingTD) error
 
 	// Subscribe subscribes a handler to all messages from a Thing
 	//  thingID is the unique ID of the Thing that is be subscribed to. Use "" for all things (use with caution)
@@ -68,14 +71,16 @@ type IHubClient interface {
 	Subscribe(thingID string,
 		handler func(thingID string, msgType string, message []byte, senderID string))
 
-	// SubscribeToAction subscribes a handler to requested actions.
+	// SubscribeToActions subscribes a handler to requested actions.
 	// This is intended for Things and Hub plugins that have actions defined in their TD
 	//  thingID is the unique ID of the Thing that is subscribing.
 	//  handler is the code that handles the action request
 	//     thingID whose action is received
-	//     action is an unmarshalled JSON document containing the action requests
+	//     name is the name of the action
+	//     params contains the action input parameters
 	//     senderID is the authenticated client ID of the sender
-	SubscribeToActions(thingID string, handler func(thingID string, action map[string]interface{}, senderID string))
+	SubscribeToActions(thingID string,
+		handler func(thingID string, name string, params map[string]interface{}, senderID string))
 
 	// SubscribeToConfig subscribes a handler to receive the request for configuration updates.
 	// This is intended for Things and Hub plugins that have writable configuration defined in their TD
@@ -111,7 +116,7 @@ type IHubClient interface {
 	//    thingID is the ID of the Thing whose TD is received
 	//    td is an unmarshalled JSON document containing the received Thing Description
 	//    senderID is the authenticated client ID of the sender
-	SubscribeToTD(thingID string, handler func(thingID string, td map[string]interface{}, senderID string))
+	SubscribeToTD(thingID string, handler func(thingID string, td ThingTD, senderID string))
 
 	// Unsubscribe from all messages from thing with thingID
 	Unsubscribe(thingID string)
