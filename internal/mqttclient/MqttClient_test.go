@@ -27,6 +27,7 @@ const TEST_TOPIC = "test"
 
 // For running mosquitto in test
 const mosquittoConfigFile = "mosquitto-test.conf"
+const testPluginID = "test-user"
 
 var mosquittoCmd *exec.Cmd
 
@@ -52,10 +53,10 @@ func TestMqttConnect(t *testing.T) {
 
 	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
 	client.SetTimeout(10)
-	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
+	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.NoError(t, err)
 	// reconnect
-	err = client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
+	err = client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.NoError(t, err)
 	client.Disconnect()
 }
@@ -67,7 +68,7 @@ func TestMqttNoConnect(t *testing.T) {
 	client := mqttclient.NewMqttClient(invalidHost, mqttTestCaCertFile)
 	client.SetTimeout(5)
 	require.NotNil(t, client)
-	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
+	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.Error(t, err)
 	client.Disconnect()
 }
@@ -84,7 +85,7 @@ func TestMQTTPubSub(t *testing.T) {
 
 	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
 	client.SetTimeout(5)
-	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
+	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 
 	client.Subscribe(TEST_TOPIC, func(channel string, msg []byte) {
@@ -121,7 +122,7 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 
 	// mqttMessenger := NewMqttMessenger(clientID, mqttCertFolder)
 	client.SetTimeout(5)
-	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
+	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 	handler1 := func(channel string, msg []byte) {
 		rxMutex.Lock()
@@ -191,7 +192,7 @@ func TestMQTTBadUnsubscribe(t *testing.T) {
 
 	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
 	client.SetTimeout(10)
-	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
+	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 
 	client.Unsubscribe(TEST_TOPIC)
@@ -230,7 +231,7 @@ func TestMQTTSubBeforeConnect(t *testing.T) {
 	client.Subscribe(TEST_TOPIC, handler1)
 
 	client.SetTimeout(timeout)
-	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
+	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 
@@ -267,7 +268,7 @@ func TestSubscribeWildcard(t *testing.T) {
 
 	// connect after subscribe uses resubscribe
 	client.SetTimeout(timeout)
-	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
+	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 

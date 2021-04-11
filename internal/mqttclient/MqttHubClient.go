@@ -38,7 +38,7 @@ func (client *MqttHubClient) Start() error {
 	// client.senderVerification = senderVerification
 	client.mqttClient.SetTimeout(client.timeoutSec)
 	if client.clientCertFile != "" && client.clientKeyFile != "" {
-		return client.mqttClient.ConnectWithClientCert(client.clientCertFile, client.clientKeyFile)
+		return client.mqttClient.ConnectWithClientCert(client.userName, client.clientCertFile, client.clientKeyFile)
 	} else {
 		return client.mqttClient.ConnectWithPassword(client.userName, client.password)
 	}
@@ -254,17 +254,19 @@ func NewMqttHubClient(hostPort string, caCertFile string, userName string, passw
 
 // NewMqttHubClient creates a new hub connection for Plugins
 // Plugins use a client certificate to authenticate.
-//   hostPort address and port to connect to
-//   caCertFile containing the broker CA certificate for TLS connections
+//  pluginID is the username (no pass needed) to identify as
+//  hostPort address and port to connect to
+//  caCertFile containing the broker CA certificate for TLS connections
 //  clientCertFile for client authentication
 //  clientKeyFile for client authentication
-func NewMqttHubPluginClient(hostPort string, caCertFile string,
+func NewMqttHubPluginClient(pluginID string, hostPort string, caCertFile string,
 	clientCertFile string, clientKeyFile string) api.IHubClient {
 
 	client := &MqttHubClient{
 		timeoutSec:     3,
 		clientCertFile: clientCertFile,
 		clientKeyFile:  clientKeyFile,
+		userName:       pluginID,
 		mqttClient:     NewMqttClient(hostPort, caCertFile),
 	}
 	return client

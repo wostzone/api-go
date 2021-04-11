@@ -22,16 +22,15 @@ func NewHubClient(hostPort string, caCertFile string, clientID string, credentia
 }
 
 // NewPluginClient creates a new hub connection for plugins.
-// plugins are very similar to consumers, except they have access to the hubconfig file
-//   hostPort address and port to connect to
-//   caCertFile CA certificate for verifying the TLS connections
-//   clientID to identify as. Leave empty to use hostname-timestamp
-//   credentials with secret to verify the identity
-func NewPluginClient(clientID string, hubConfig *hubconfig.HubConfig) api.IHubClient {
+// plugins must authenticate with a client certificate.
+//   pluginID is the plugin instance ID used to connect with
+//   hubConfig with Hub configuration include certificate location
+func NewPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) api.IHubClient {
 	hostPort := fmt.Sprintf("%s:%d", hubConfig.Messenger.Address, hubConfig.Messenger.Port)
 	caCertFile := path.Join(hubConfig.CertsFolder, certsetup.CaCertFile)
+	clientCertFile := path.Join(hubConfig.CertsFolder, certsetup.ClientCertFile)
+	clientKeyFile := path.Join(hubConfig.CertsFolder, certsetup.ClientKeyFile)
 
-	credentials := "" // todo
-	client := mqttclient.NewMqttHubClient(hostPort, caCertFile, clientID, credentials)
+	client := mqttclient.NewMqttHubPluginClient(pluginID, hostPort, caCertFile, clientCertFile, clientKeyFile)
 	return client
 }

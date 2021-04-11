@@ -99,7 +99,7 @@ func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName stri
 		rootCA = x509.NewCertPool()
 		caFile, err := ioutil.ReadFile(mqttClient.tlsCACertFile)
 		if err != nil {
-			logrus.Errorf("MqttClient.Connect: Unable to read CA certificate chain: %s", err)
+			logrus.Errorf("MqttClient.Connect: Unable to read CA certificate chain: %s. Ignored.", err)
 		}
 		rootCA.AppendCertsFromPEM([]byte(caFile))
 
@@ -168,9 +168,10 @@ func (mqttClient *MqttClient) ConnectWithPassword(userName string, password stri
 }
 
 // Connect to the MQTT broker using client certificate authentication
+//  pluginID to connect as (no pass required)
 //  clientCertFile optional client certificate to authenticate the client with the broker
 //  clientKeyFile  optional client key to authenticate the client with the broker
-func (mqttClient *MqttClient) ConnectWithClientCert(clientCertFile string, clientKeyFile string) error {
+func (mqttClient *MqttClient) ConnectWithClientCert(pluginID string, clientCertFile string, clientKeyFile string) error {
 	if clientCertFile == "" || clientKeyFile == "" {
 		err := mqttClient.Connect(nil, "", "")
 		return err
@@ -180,7 +181,7 @@ func (mqttClient *MqttClient) ConnectWithClientCert(clientCertFile string, clien
 		logrus.Errorf("ConnectWithClientCert: Failed to connect. Error loading certificates: %s", err)
 		return err
 	}
-	err = mqttClient.Connect(&clientCert, "", "")
+	err = mqttClient.Connect(&clientCert, pluginID, "")
 	return err
 
 }

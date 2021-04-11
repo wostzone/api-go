@@ -16,7 +16,7 @@ const zone = "test"
 const mqttTestConsumerConnection = "localhost:33101"
 const mqttTestThingConnection = "localhost:33101"
 
-// THIS USES THE SETUP IN MqqttClient_test.go
+// THIS USES THE SETUP IN MqttClient_test.go
 
 func TestPublishAction(t *testing.T) {
 	logrus.Infof("--- TestPublishAction ---")
