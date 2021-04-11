@@ -38,15 +38,15 @@ type HubConfig struct {
 
 	// Configuration of hub client messaging
 	Messenger struct {
-		Address     string `yaml:"address"`           // address with hostname or ip of the message bus
-		Port        int    `yaml:"port,omitempty"`    // optional port, default is 8883 for MQTT TLS
-		CertsFolder string `yaml:"certsFolder"`       // Folder containing certificates, default is {home}/certs
-		Signing     bool   `yaml:"signing,omitempty"` // Message signing to be used by all publishers, default is false
-		Timeout     int    `yaml:"timeout,omitempty"` // Client connection timeout in seconds. 0 for indefinite
+		Address string `yaml:"address"`           // address with hostname or ip of the message bus
+		Port    int    `yaml:"port,omitempty"`    // optional port, default is 8883 for MQTT TLS
+		Signing bool   `yaml:"signing,omitempty"` // Message signing to be used by all publishers, default is false
+		Timeout int    `yaml:"timeout,omitempty"` // Client connection timeout in seconds. 0 for indefinite
 	} `yaml:"messenger"`
 
 	Home         string   `yaml:"home"`         // application home directory. Default is parent of executable.
 	Zone         string   `yaml:"zone"`         // zone this hub belongs to. Used as prefix in ThingID, default is local
+	CertsFolder  string   `yaml:"certsFolder"`  // Folder containing certificates, default is {home}/certs
 	ConfigFolder string   `yaml:"configFolder"` // location of configuration files. Default is ./config
 	PluginFolder string   `yaml:"pluginFolder"` // location of plugin binaries. Default is ./bin
 	Plugins      []string `yaml:"plugins"`      // names of plugins to start
@@ -83,7 +83,7 @@ func CreateDefaultHubConfig(homeFolder string) *HubConfig {
 		Zone:         "local",
 	}
 	// config.Messenger.CertsFolder = path.Join(homeFolder, "certs")
-	config.Messenger.CertsFolder = path.Join(homeFolder, DefaultCertsFolder)
+	config.CertsFolder = path.Join(homeFolder, DefaultCertsFolder)
 	// config.Messenger.CaCertFile = certsetup.CaCertFile
 	// config.Messenger.ServerCertFile = certsetup.ServerCertFile
 	// config.Messenger.ClientCertFile = certsetup.ClientCertFile
@@ -116,6 +116,74 @@ func LoadConfig(configFile string, config interface{}) error {
 	return nil
 }
 
+// LoadHubConfig loads the hub configuration
+// This uses the -home and -c commandline arguments commands without the flag package.
+// Intended for plugins or Hub apps that have their own commandlines but still need to use the
+// Hub's base configuration.
+// See also LoadCommandlineConfig() for including plugin and commandline options.
+//
+// This checks the following commandline arguments:
+//  - Commandline "-c"  specifies an alternative hub configuration file
+//  - Commandline "--home" sets the home folder as the base of ./config, ./logs and ./bin directories
+//
+//  homeFolder overrides the default home folder. Leave empty to use parent of application binary.
+// The current working directory is changed to this folder
+//  Returns the hub configuration and error code in case of error
+func LoadHubConfig(homeFolder string) (*HubConfig, error) {
+	args := os.Args[1:]
+	if homeFolder == "" {
+		// Option --home overrides the default home folder. Intended for testing.
+		for index, arg := range args {
+			if arg == "--home" || arg == "-home" {
+				homeFolder = args[index+1]
+				// make relative paths absolute
+				if !path.IsAbs(homeFolder) {
+					cwd, _ := os.Getwd()
+					homeFolder = path.Join(cwd, homeFolder)
+				}
+				break
+			}
+		}
+	}
+
+	// set configuration defaults
+	hubConfig := CreateDefaultHubConfig(homeFolder)
+	hubConfigFile := path.Join(hubConfig.ConfigFolder, HubConfigName)
+
+	// Option -c overrides the default hub config file. Intended for testing.
+	args = os.Args[1:]
+	for index, arg := range args {
+		if arg == "-c" {
+			hubConfigFile = args[index+1]
+			// make relative paths absolute
+			if !path.IsAbs(hubConfigFile) {
+				hubConfigFile = path.Join(homeFolder, hubConfigFile)
+			}
+			break
+		}
+	}
+	logrus.Infof("Using %s as hub config file", hubConfigFile)
+	err1 := LoadConfig(hubConfigFile, hubConfig)
+	if err1 != nil {
+		// panic("Unable to continue without hub.yaml")
+		return hubConfig, err1
+	}
+
+	// make sure folders have an absolute path
+	if !path.IsAbs(hubConfig.CertsFolder) {
+		hubConfig.CertsFolder = path.Join(homeFolder, hubConfig.CertsFolder)
+	}
+	if !path.IsAbs(hubConfig.PluginFolder) {
+		hubConfig.PluginFolder = path.Join(homeFolder, hubConfig.PluginFolder)
+	}
+
+	err2 := ValidateConfig(hubConfig)
+	if err2 != nil {
+		return hubConfig, err2
+	}
+	return hubConfig, nil
+}
+
 // ValidateConfig checks if values in the hub configuration are correct
 // Returns an error if the config is invalid
 func ValidateConfig(config *HubConfig) error {
@@ -134,8 +202,8 @@ func ValidateConfig(config *HubConfig) error {
 		return err
 	}
 
-	if _, err := os.Stat(config.Messenger.CertsFolder); os.IsNotExist(err) {
-		logrus.Errorf("TLS certificate folder '%s' not found\n", config.Messenger.CertsFolder)
+	if _, err := os.Stat(config.CertsFolder); os.IsNotExist(err) {
+		logrus.Errorf("TLS certificate folder '%s' not found\n", config.CertsFolder)
 		return err
 	}
 	// // Pluginfolder is either empty or must exist

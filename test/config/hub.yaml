@@ -2,18 +2,17 @@
 
 # Message bus server
 messenger:
-  certFolder: "/etc/mosquitto/certs" # set to activate TLS. Relative to app home folder
-  # certsFolder: "./certs" # set to activate TLS. Relative to app home folder
   address: "localhost"
-  port: 8883
+  port: 33100 # must match mosquitto-test.conf
   timeout: 1
 
 # Logging
 logging:
-  #logFile: "../logs/hub.log" # relative to this config file
+  #logFile: "../logs/hub.log" # relative to the home directory
   logLevel: "info" # debug, info, warning, error. Default is warning
 
-#configFolder: "../config" # plugin config, relative to the working directory
+#configFolder: "./config" # plugin config, relative to the home directory
+certsFolder: "./certs" # set to activate TLS. Relative to app home directory
 
 # Plugins to start
 plugins: # list of plugins to start

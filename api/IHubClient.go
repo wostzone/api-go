@@ -17,11 +17,8 @@ type ThingTD map[string]interface{}
 // the protocol bindings.
 // Intended for Things, consumers and plugins to exchange messages.
 type IHubClient interface {
-	// Start the client connection with the Hub using the hostname, clientID and credentials that were
-	// provided with the registration.
-	//  senderVerification includes a sender clientID and signature with the message to verify integrity
-	// and authenticity of the sender using the Hub public certificate.
-	Start(senderVerification bool) error
+	// Start the client connection with the Hub
+	Start() error
 
 	// End the hub connection
 	Stop()

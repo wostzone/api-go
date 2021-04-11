@@ -2,10 +2,12 @@
 
 # Message bus server
 messenger:
-  certFolder: "/invalid/folder" # set to activate TLS
   address: "localhost"
   port: 8883 # local mosquitto test server
   timeout: 1
+
+# invalid because the folder doesn't exist
+certsFolder: "/invalid/folder" # set to activate TLS
 
 # Logging
 logging:

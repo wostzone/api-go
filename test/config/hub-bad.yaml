@@ -1,14 +1,16 @@
 # Bad configuration file for tests
+# DONT CHANGE THE LINES AS THE TEST EXPECTS AN ERROR ON LINE 11
 
 # Message bus server
 messenger:
-  #certFolder: "./certs" # set to activate TLS
   #protocol: "" # internal, MQTT, default internal
   #address: "localhost" # hostname or address to listen on
   #port: 9678
   # the next line intentionally causes an error 
   -brokenyamlfile
   timeout: 1
+
+#certsFolder: "./certs" # set to activate TLS
 
 # Logging
 logging:

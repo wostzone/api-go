@@ -19,19 +19,29 @@ B: https://github.com/emqx/emqx
 // events and actions.
 // This implements the IHubConnection API
 type MqttHubClient struct {
-	mqttClient         *MqttClient
-	clientID           string
-	timeoutSec         int
-	senderVerification bool
+	// authentication using client cert
+	clientCertFile string
+	clientKeyFile  string
+	// authentication using username/password
+	userName string
+	password string
+	//
+	mqttClient *MqttClient
+	timeoutSec int
+	// senderVerification bool
 }
 
 // Start the client connection
-func (client *MqttHubClient) Start(senderVerification bool) error {
+func (client *MqttHubClient) Start() error {
 	logrus.Infof("Starting MQTT Hub client. Connecting to '%s'. CaCertFile '%s'",
 		client.mqttClient.hostPort, client.mqttClient.tlsCACertFile)
-	client.senderVerification = senderVerification
-	err := client.mqttClient.Connect(client.clientID, client.timeoutSec)
-	return err
+	// client.senderVerification = senderVerification
+	client.mqttClient.SetTimeout(client.timeoutSec)
+	if client.clientCertFile != "" && client.clientKeyFile != "" {
+		return client.mqttClient.ConnectWithClientCert(client.clientCertFile, client.clientKeyFile)
+	} else {
+		return client.mqttClient.ConnectWithPassword(client.userName, client.password)
+	}
 }
 
 // End the client connection
@@ -226,16 +236,36 @@ func (client *MqttHubClient) Unsubscribe(thingID string) {
 	client.mqttClient.Unsubscribe(topic)
 }
 
-// NewMqttHubClient creates a new hub connection for Thing consumers
+// NewMqttHubClient creates a new hub connection for Things and consumers
+// Consumers use a login name and password to authenticate while Things can use
+// their thingID and shared key obtained during provisioning.
 //   hostPort address and port to connect to
-//   certFolder containing server and client certificates for TLS connections
-//   clientID to identify as. Leave empty to use hostname-timestamp
-//   credentials with secret to verify the identity
-func NewMqttHubClient(hostPort string, caCertFile string, clientID string, credentials string) api.IHubClient {
+//   caCertFile containing the broker CA certificate for TLS connections
+//   userName of user that is connecting, or thingID of device
+//   password credentials with secret to verify the identity, eg password or Shared Key
+func NewMqttHubClient(hostPort string, caCertFile string, userName string, password string) api.IHubClient {
+
 	client := &MqttHubClient{
 		timeoutSec: 3,
-		clientID:   clientID,
 		mqttClient: NewMqttClient(hostPort, caCertFile),
+	}
+	return client
+}
+
+// NewMqttHubClient creates a new hub connection for Plugins
+// Plugins use a client certificate to authenticate.
+//   hostPort address and port to connect to
+//   caCertFile containing the broker CA certificate for TLS connections
+//  clientCertFile for client authentication
+//  clientKeyFile for client authentication
+func NewMqttHubPluginClient(hostPort string, caCertFile string,
+	clientCertFile string, clientKeyFile string) api.IHubClient {
+
+	client := &MqttHubClient{
+		timeoutSec:     3,
+		clientCertFile: clientCertFile,
+		clientKeyFile:  clientKeyFile,
+		mqttClient:     NewMqttClient(hostPort, caCertFile),
 	}
 	return client
 }

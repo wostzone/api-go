@@ -12,28 +12,30 @@ import (
 	"github.com/wostzone/hubapi/pkg/td"
 )
 
-// !!! THIS REQUIRES A RUNNING MQTT SERVER ON LOCALHOST WITH CERTS !!!
 const zone = "test"
+const mqttTestConsumerConnection = "localhost:33101"
+const mqttTestThingConnection = "localhost:33101"
+
+// THIS USES THE SETUP IN MqqttClient_test.go
 
 func TestPublishAction(t *testing.T) {
 	logrus.Infof("--- TestPublishAction ---")
 
-	credentials := ""
 	thingID := "thing1"
 	var rxName string
 	var rxParams map[string]interface{}
 	actionName := "action1"
 	actionInput := map[string]interface{}{"input1": "inputValue"}
-	consumerClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	thingClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
+	consumerClient := mqttclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", "")
+	thingClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", "")
 	thingClient.SubscribeToActions(thingID, func(thingID string, name string, params map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishAction: Received action of Thing %s from client %s", thingID, sender)
 		rxName = name
 		rxParams = params
 	})
 
-	err := consumerClient.Start(false)
-	err = thingClient.Start(false)
+	err := consumerClient.Start()
+	err = thingClient.Start()
 	assert.NoError(t, err)
 
 	time.Sleep(time.Millisecond)
@@ -61,16 +63,16 @@ func TestPublishConfig(t *testing.T) {
 	var rxID string
 
 	config1 := map[string]interface{}{"prop1": "value1"}
-	consumerClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	thingClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
+	consumerClient := mqttclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
+	thingClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
 	thingClient.SubscribeToConfig(thingID, func(thingID string, config map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishConfig: Received config of Thing %s from client %s", thingID, sender)
 		rx = config
 		rxID = thingID
 	})
 
-	err := consumerClient.Start(false)
-	err = thingClient.Start(false)
+	err := consumerClient.Start()
+	err = thingClient.Start()
 	assert.NoError(t, err)
 
 	time.Sleep(100 * time.Millisecond)
@@ -94,12 +96,12 @@ func TestPublishEvent(t *testing.T) {
 	event1 := map[string]interface{}{"eventName": "eventValue"}
 	var rx map[string]interface{}
 
-	consumerClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	thingClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
+	consumerClient := mqttclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
+	thingClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
 
-	err := thingClient.Start(false)
+	err := thingClient.Start()
 	assert.NoError(t, err)
-	err = consumerClient.Start(false)
+	err = consumerClient.Start()
 	assert.NoError(t, err)
 	consumerClient.SubscribeToEvents(thingID, func(thingID string, event map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishEvent: Received event of Thing %s from client %s", thingID, sender)
@@ -126,11 +128,11 @@ func TestPublishPropertyValues(t *testing.T) {
 	propValues := map[string]interface{}{"propname": "value"}
 	var rx map[string]interface{}
 
-	thingClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	err := thingClient.Start(false)
+	thingClient := mqttclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
+	err := thingClient.Start()
 	assert.NoError(t, err)
-	consumerClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	err = consumerClient.Start(false)
+	consumerClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
+	err = consumerClient.Start()
 	assert.NoError(t, err)
 	consumerClient.SubscribeToPropertyValues(thingID, func(thingID string, values map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishPropertyValues: Received values of Thing %s from client %s", thingID, sender)
@@ -155,11 +157,11 @@ func TestPublishTD(t *testing.T) {
 	td1 := td.CreateTD(thingID, api.DeviceTypeSensor)
 	var rxTd map[string]interface{}
 
-	thingClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	err := thingClient.Start(false)
+	thingClient := mqttclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
+	err := thingClient.Start()
 	assert.NoError(t, err)
-	consumerClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	err = consumerClient.Start(false)
+	consumerClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
+	err = consumerClient.Start()
 	assert.NoError(t, err)
 	consumerClient.SubscribeToTD(thingID, func(thingID string, thing api.ThingTD, sender string) {
 		logrus.Infof("TestPublishTD: Received TD of Thing %s from client %s", thingID, sender)
@@ -189,11 +191,11 @@ func TestSubscribeAll(t *testing.T) {
 	var rxTd []byte
 	var rxThing string
 
-	pluginClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	err := pluginClient.Start(false)
+	pluginClient := mqttclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
+	err := pluginClient.Start()
 	assert.NoError(t, err)
-	thingClient := mqttclient.NewMqttHubClient(mqttTestServerHostPort, mqttTestCaCertFile, "", credentials)
-	err = thingClient.Start(false)
+	thingClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
+	err = thingClient.Start()
 	assert.NoError(t, err)
 	pluginClient.Subscribe("", func(thingID string, msgType string, raw []byte, sender string) {
 		logrus.Infof("TestSubscribe: Received msg %s of Thing %s from client %s", msgType, thingID, sender)

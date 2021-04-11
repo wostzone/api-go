@@ -34,7 +34,7 @@ func SetHubCommandlineArgs(config *HubConfig) {
 	flag.String("c", "hub.yaml", "Set the hub configuration file ")
 	flag.StringVar(&config.Home, "home", config.Home, "Application working `folder`")
 
-	flag.StringVar(&config.Messenger.CertsFolder, "certsFolder", config.Messenger.CertsFolder, "Optional certificates directory for TLS")
+	flag.StringVar(&config.CertsFolder, "certsFolder", config.CertsFolder, "Optional certificates directory for TLS")
 	flag.StringVar(&config.ConfigFolder, "configFolder", config.ConfigFolder, "Plugin configuration `folder`")
 	flag.StringVar(&config.Messenger.Address, "address", config.Messenger.Address, "Message bus hostname or address")
 	flag.IntVar(&config.Messenger.Port, "port", config.Messenger.Port, "Message bus server port")
@@ -44,12 +44,13 @@ func SetHubCommandlineArgs(config *HubConfig) {
 }
 
 // LoadPluginConfig loads the hub and plugin configuration
+//
 // This uses the -home and -c commandline arguments commands without the
 // flag package.
 // Intended for plugins or Hub apps that have their own commandlines but
 // still need to use the Hub's base configuration.
 //
-// // The default hub config filename is 'hub.yaml' (const HubConfigName)
+// The default hub config filename is 'hub.yaml' (const HubConfigName)
 // The plugin configuration is the {pluginName}.yaml. If no pluginName is given it is ignored.
 // The plugin logfile is stored in the hub logging folder using the pluginName.log filename
 // This loads the hub commandline arguments with two special considerations:
@@ -57,7 +58,7 @@ func SetHubCommandlineArgs(config *HubConfig) {
 //  - Commandline "--home" sets the home folder as the base of ./config, ./logs and ./bin directories
 //       The homeFolder argument takes precedence
 //
-// homeFolder overrides the default home folder
+//  homeFolder overrides the default home folder
 //     Leave empty to use parent of application binary. Intended for running tests.
 //     The current working directory is changed to this folder
 // pluginName is used as the ID in messaging and the plugin configuration filename
@@ -65,38 +66,11 @@ func SetHubCommandlineArgs(config *HubConfig) {
 // pluginConfig is the configuration to load. nil to only load the hub config.
 // Returns the hub configuration and error code in case of error
 func LoadPluginConfig(homeFolder string, pluginName string, pluginConfig interface{}) (*HubConfig, error) {
-	args := os.Args[1:]
-	if homeFolder == "" {
-		// Option --home overrides the default home folder. Intended for testing.
-		for index, arg := range args {
-			if arg == "--home" || arg == "-home" {
-				homeFolder = args[index+1]
-				// make relative paths absolute
-				if !path.IsAbs(homeFolder) {
-					cwd, _ := os.Getwd()
-					homeFolder = path.Join(cwd, homeFolder)
-				}
-				break
-			}
-		}
+	hubConfig, err := LoadHubConfig(homeFolder)
+	if err != nil {
+		return hubConfig, err
 	}
 
-	// set configuration defaults
-	hubConfig := CreateDefaultHubConfig(homeFolder)
-	hubConfigFile := path.Join(hubConfig.ConfigFolder, HubConfigName)
-
-	// Option -c overrides the default hub config file. Intended for testing.
-	args = os.Args[1:]
-	for index, arg := range args {
-		if arg == "-c" {
-			hubConfigFile = args[index+1]
-			// make relative paths absolute
-			if !path.IsAbs(hubConfigFile) {
-				hubConfigFile = path.Join(homeFolder, hubConfigFile)
-			}
-			break
-		}
-	}
 	// plugin config is optional
 	if pluginName != "" && pluginConfig != nil {
 		pluginConfigFile := path.Join(hubConfig.ConfigFolder, pluginName+".yaml")
@@ -106,16 +80,6 @@ func LoadPluginConfig(homeFolder string, pluginName string, pluginConfig interfa
 		}
 	}
 
-	logrus.Infof("Using %s as hub config file", hubConfigFile)
-	err1 := LoadConfig(hubConfigFile, hubConfig)
-	if err1 != nil {
-		// panic("Unable to continue without hub.yaml")
-		return hubConfig, err1
-	}
-	err2 := ValidateConfig(hubConfig)
-	if err2 != nil {
-		return hubConfig, err2
-	}
 	return hubConfig, nil
 }
 

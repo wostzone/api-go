@@ -1,0 +1,33 @@
+// Package mosquitto with launching of the mosquitto broker
+package mosquitto
+
+import (
+	"os"
+	"os/exec"
+	"time"
+
+	"github.com/sirupsen/logrus"
+)
+
+// launch mosquitto with the given configuration file. This attaches stderr and stdout
+// to the current process.
+//  returns with the command. Use cmd.Process.Kill to terminate.
+func Launch(configFile string) *exec.Cmd {
+
+	logrus.Infof("--- Starting mosquitto broker ---")
+
+	// mosquitto must be in the path
+	cmd := exec.Command("mosquitto", "-c", configFile)
+	// Capture stderr in case of startup failure
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Start()
+	go func() {
+		cmd.Wait()
+		logrus.Infof("--- Mosquitto has ended ---")
+	}()
+	// Give mosquitto some time to start
+	time.Sleep(10 * time.Millisecond)
+
+	return cmd
+}

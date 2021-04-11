@@ -125,7 +125,9 @@ func CreateHubCert(caCertPEM []byte, caKeyPEM []byte, hostname string) (pkPEM []
 	if err != nil {
 		return nil, nil, err
 	}
-	// hostname = "localhost"
+	if hostname == "" {
+		hostname = "localhost"
+	}
 	// set up our server certificate
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(2021),

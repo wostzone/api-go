@@ -29,7 +29,8 @@ func NewHubClient(hostPort string, caCertFile string, clientID string, credentia
 //   credentials with secret to verify the identity
 func NewPluginClient(clientID string, hubConfig *hubconfig.HubConfig) api.IHubClient {
 	hostPort := fmt.Sprintf("%s:%d", hubConfig.Messenger.Address, hubConfig.Messenger.Port)
-	caCertFile := path.Join(hubConfig.Messenger.CertsFolder, certsetup.CaCertFile)
+	caCertFile := path.Join(hubConfig.CertsFolder, certsetup.CaCertFile)
+
 	credentials := "" // todo
 	client := mqttclient.NewMqttHubClient(hostPort, caCertFile, clientID, credentials)
 	return client

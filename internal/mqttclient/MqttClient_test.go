@@ -1,6 +1,9 @@
 package mqttclient_test
 
 import (
+	"os"
+	"os/exec"
+	"path"
 	"sync"
 	"testing"
 	"time"
@@ -10,27 +13,49 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wostzone/hubapi/internal/mqttclient"
 	"github.com/wostzone/hubapi/pkg/certsetup"
+	"github.com/wostzone/hubapi/pkg/mosquitto"
 )
 
-// !!! USE THE MOSQUITTO CONFIGURATION FOR THIS TEST !!!
-// See /etc/mosquitto/conf.d/wost.conf
-const mqttTestServerHostPort = "localhost:8883"
-const mqttTestCaCertFile = "/etc/mosquitto/certs/" + certsetup.CaCertFile
+// Use test/mosquitto-test.conf
+const mqttTestPluginConnection = "localhost:33100"
 
-// const caCertFile = "/etc/mosquitto/certs/" + certsetup.ServerCertFile
+const mqttTestCaCertFile = "certs/" + certsetup.CaCertFile
+const mqttTestClientCertFile = "certs/" + certsetup.ClientCertFile
+const mqttTestClientKeyFile = "certs/" + certsetup.ClientKeyFile
+
 const TEST_TOPIC = "test"
 
-// These tests require an MQTT TLS server on localhost with TLS support
+// For running mosquitto in test
+const mosquittoConfigFile = "mosquitto-test.conf"
+
+var mosquittoCmd *exec.Cmd
+
+// setup - launch mosquitto
+func TestMain(m *testing.M) {
+	cwd, _ := os.Getwd()
+	home := path.Join(cwd, "../../test")
+	os.Chdir(home)
+	certsFolder := path.Join(home, "certs")
+	configFolder := path.Join(home, "config")
+	certsetup.CreateCertificates("localhost", certsFolder)
+	mosqConfigPath := path.Join(configFolder, mosquittoConfigFile)
+	mosquittoCmd = mosquitto.Launch(mosqConfigPath)
+
+	result := m.Run()
+	mosquittoCmd.Process.Kill()
+
+	os.Exit(result)
+}
 
 func TestMqttConnect(t *testing.T) {
 	logrus.Infof("--- TestMqttConnect ---")
 
-	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
-	const timeout = 10
-	err := client.Connect("", timeout)
+	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client.SetTimeout(10)
+	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.NoError(t, err)
 	// reconnect
-	err = client.Connect("", timeout)
+	err = client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.NoError(t, err)
 	client.Disconnect()
 }
@@ -40,9 +65,9 @@ func TestMqttNoConnect(t *testing.T) {
 
 	invalidHost := "nohost:1111"
 	client := mqttclient.NewMqttClient(invalidHost, mqttTestCaCertFile)
-	timeout := 5
+	client.SetTimeout(5)
 	require.NotNil(t, client)
-	err := client.Connect("", timeout)
+	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.Error(t, err)
 	client.Disconnect()
 }
@@ -57,8 +82,9 @@ func TestMQTTPubSub(t *testing.T) {
 	const timeout = 10
 	// certFolder := ""
 
-	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
-	err := client.Connect("", timeout)
+	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client.SetTimeout(5)
+	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 
 	client.Subscribe(TEST_TOPIC, func(channel string, msg []byte) {
@@ -84,7 +110,7 @@ func TestMQTTPubSub(t *testing.T) {
 func TestMQTTMultipleSubscriptions(t *testing.T) {
 	logrus.Infof("--- TestMQTTMultipleSubscriptions ---")
 
-	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
+	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
 	var rx1 string
 	var rx2 string
 	rxMutex := sync.Mutex{}
@@ -94,7 +120,8 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 	const timeout = 10
 
 	// mqttMessenger := NewMqttMessenger(clientID, mqttCertFolder)
-	err := client.Connect("", timeout)
+	client.SetTimeout(5)
+	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 	handler1 := func(channel string, msg []byte) {
 		rxMutex.Lock()
@@ -162,10 +189,9 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 func TestMQTTBadUnsubscribe(t *testing.T) {
 	logrus.Infof("--- TestMQTTBadUnsubscribe ---")
 
-	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
-	const timeout = 10
-
-	err := client.Connect("", timeout)
+	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client.SetTimeout(10)
+	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 
 	client.Unsubscribe(TEST_TOPIC)
@@ -177,10 +203,7 @@ func TestMQTTPubNoConnect(t *testing.T) {
 
 	invalidHost := "localhost:1111"
 	client := mqttclient.NewMqttClient(invalidHost, mqttTestCaCertFile)
-	const timeout = 10
 	var msg1 = "Hello world 1"
-
-	// mqttMessenger := NewMqttMessenger(clientID, mqttCertFolder)
 
 	err := client.Publish(TEST_TOPIC, []byte(msg1))
 	require.Error(t, err)
@@ -191,7 +214,7 @@ func TestMQTTPubNoConnect(t *testing.T) {
 func TestMQTTSubBeforeConnect(t *testing.T) {
 	logrus.Infof("--- TestMQTTSubBeforeConnect ---")
 
-	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
+	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
 	const timeout = 10
 	const msg = "hello 1"
 	var rx string
@@ -206,7 +229,8 @@ func TestMQTTSubBeforeConnect(t *testing.T) {
 	}
 	client.Subscribe(TEST_TOPIC, handler1)
 
-	err := client.Connect("", timeout)
+	client.SetTimeout(timeout)
+	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 
@@ -226,7 +250,7 @@ func TestSubscribeWildcard(t *testing.T) {
 	const testTopic1 = "test/1/5"
 	const wildcardTopic = "test/+/#"
 
-	client := mqttclient.NewMqttClient(mqttTestServerHostPort, mqttTestCaCertFile)
+	client := mqttclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
 	const timeout = 10
 	const msg = "hello 1"
 	var rx string
@@ -242,7 +266,8 @@ func TestSubscribeWildcard(t *testing.T) {
 	client.Subscribe(wildcardTopic, handler1)
 
 	// connect after subscribe uses resubscribe
-	err := client.Connect("", timeout)
+	client.SetTimeout(timeout)
+	err := client.ConnectWithClientCert(mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 

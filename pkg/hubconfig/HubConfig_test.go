@@ -19,13 +19,13 @@ type ConfigType1 struct {
 func TestDefaultConfigNoHome(t *testing.T) {
 	// This result is unpredictable as it depends on where the binary lives.
 	// This changes depends on whether to run as debug, coverage or F5 run
-	gc := hubconfig.CreateDefaultHubConfig("")
-	require.NotNil(t, gc)
-	err := hubconfig.ValidateConfig(gc)
+	hc := hubconfig.CreateDefaultHubConfig("")
+	require.NotNil(t, hc)
+	err := hubconfig.ValidateConfig(hc)
 	_ = err // unpredictable outcome
 	// assert.NoError(t, err)
-	gc = hubconfig.CreateDefaultHubConfig("./")
-	require.NotNil(t, gc)
+	hc = hubconfig.CreateDefaultHubConfig("./")
+	require.NotNil(t, hc)
 	_ = err // unpredictable outcome
 	// assert.NoError(t, err)
 
@@ -36,41 +36,43 @@ func TestDefaultConfigWithHome(t *testing.T) {
 	wd, _ := os.Getwd()
 	home := path.Join(wd, "../../test")
 	logrus.Infof("TestDefaultConfig: Current folder is %s", wd)
-	gc := hubconfig.CreateDefaultHubConfig(home)
-	require.NotNil(t, gc)
-	err := hubconfig.ValidateConfig(gc)
+	hc := hubconfig.CreateDefaultHubConfig(home)
+	require.NotNil(t, hc)
+	err := hubconfig.ValidateConfig(hc)
 	assert.NoError(t, err)
 }
 
 func TestLoadHubConfig(t *testing.T) {
 	wd, _ := os.Getwd()
-	gc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
-	require.NotNil(t, gc)
+	homeFolder = path.Join(wd, "../../test")
+	// hc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
+	// require.NotNil(t, hc)
 
-	configFile := path.Join(gc.ConfigFolder, "hub.yaml")
-	err := hubconfig.LoadConfig(configFile, gc)
+	// configFile := path.Join(hc.ConfigFolder, "hub.yaml")
+	// err := hubconfig.LoadHubConfig(configFile, hc)
+	hc, err := hubconfig.LoadHubConfig(homeFolder)
 	assert.NoError(t, err)
-	err = hubconfig.ValidateConfig(gc)
+	err = hubconfig.ValidateConfig(hc)
 	assert.NoError(t, err)
-	assert.Equal(t, "info", gc.Logging.Loglevel)
+	assert.Equal(t, "info", hc.Logging.Loglevel)
 }
 
 func TestLoadHubConfigNotFound(t *testing.T) {
 	wd, _ := os.Getwd()
-	gc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
-	require.NotNil(t, gc)
-	configFile := path.Join(gc.ConfigFolder, "hub-notfound.yaml")
-	err := hubconfig.LoadConfig(configFile, gc)
+	hc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
+	require.NotNil(t, hc)
+	configFile := path.Join(hc.ConfigFolder, "hub-notfound.yaml")
+	err := hubconfig.LoadConfig(configFile, hc)
 	assert.Error(t, err, "Configfile should not be found")
 }
 
 func TestLoadHubConfigYamlError(t *testing.T) {
 	wd, _ := os.Getwd()
-	gc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
-	require.NotNil(t, gc)
+	hc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
+	require.NotNil(t, hc)
 
-	configFile := path.Join(gc.ConfigFolder, "hub-bad.yaml")
-	err := hubconfig.LoadConfig(configFile, gc)
+	configFile := path.Join(hc.ConfigFolder, "hub-bad.yaml")
+	err := hubconfig.LoadConfig(configFile, hc)
 	// Error should contain info on bad file
 	errTxt := err.Error()
 	assert.Equal(t, "yaml: line 11", errTxt[:13], "Expected line 11 to be bad")
@@ -80,27 +82,27 @@ func TestLoadHubConfigYamlError(t *testing.T) {
 func TestLoadHubConfigBadFolders(t *testing.T) {
 
 	wd, _ := os.Getwd()
-	gc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
-	err := hubconfig.ValidateConfig(gc)
+	hc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
+	err := hubconfig.ValidateConfig(hc)
 	assert.NoError(t, err, "Default config should be okay")
 
-	gc2 := *gc
+	gc2 := *hc
 	gc2.Home = "/not/a/home/folder"
 	err = hubconfig.ValidateConfig(&gc2)
 	assert.Error(t, err)
-	gc2 = *gc
+	gc2 = *hc
 	gc2.ConfigFolder = "./doesntexist"
 	err = hubconfig.ValidateConfig(&gc2)
 	assert.Error(t, err)
-	gc2 = *gc
+	gc2 = *hc
 	gc2.Logging.LogFile = "/this/path/doesntexist"
 	err = hubconfig.ValidateConfig(&gc2)
 	assert.Error(t, err)
-	gc2 = *gc
-	gc2.Messenger.CertsFolder = "./doesntexist"
+	gc2 = *hc
+	gc2.CertsFolder = "./doesntexist"
 	err = hubconfig.ValidateConfig(&gc2)
 	assert.Error(t, err)
-	gc2 = *gc
+	gc2 = *hc
 	// gc2.PluginFolder = "./doesntexist"
 	// err = hubconfig.ValidateConfig(&gc2)
 	// assert.Error(t, err)
