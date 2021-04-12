@@ -3,7 +3,10 @@
 # Message bus server
 messenger:
   address: "localhost"
-  port: 33100 # must match mosquitto-test.conf
+  clientPortMqtt: 33100
+  clientPortWS: 33101
+  pluginPortMqtt: 33102
+  pluginPortWS: 33103
   timeout: 1
 
 # Logging

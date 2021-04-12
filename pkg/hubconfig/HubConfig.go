@@ -21,7 +21,10 @@ const HubLogFile = "hub.log"
 const DefaultCertsFolder = "./certs"
 
 // DefaultPort with MQTT TLS port
-const DefaultPort = 8883
+const DefaultClientPortMqtt = 8883
+const DefaultClientPortWS = 8884
+const DefaultPluginPortMqtt = 9883
+const DefaultPluginPortWS = 9884
 
 type test interface {
 	hello()
@@ -37,11 +40,16 @@ type HubConfig struct {
 	} `yaml:"logging"`
 
 	// Configuration of hub client messaging
+	// FIXME: support multiple ports for different auths
 	Messenger struct {
-		Address string `yaml:"address"`           // address with hostname or ip of the message bus
-		Port    int    `yaml:"port,omitempty"`    // optional port, default is 8883 for MQTT TLS
-		Signing bool   `yaml:"signing,omitempty"` // Message signing to be used by all publishers, default is false
-		Timeout int    `yaml:"timeout,omitempty"` // Client connection timeout in seconds. 0 for indefinite
+		Address string `yaml:"address"` // address with hostname or ip of the message bus
+		// Port    int    `yaml:"port,omitempty"`    // optional port, default is 8883 for MQTT TLS
+		ClientPortMqtt int  `yaml:"clientPortMqtt,omitempty"` // default is 8883 for MQTT TLS
+		ClientPortWS   int  `yaml:"clientPortWS,omitempty"`   // default is 8884 for WS TLS
+		PluginPortMqtt int  `yaml:"pluginPortMqtt,omitempty"` // default is 9883 for plugin MQTT
+		PluginPortWS   int  `yaml:"pluginPortWS,omitempty"`   // default is 9884 for plugin WS
+		Signing        bool `yaml:"signing,omitempty"`        // Message signing to be used by all publishers, default is false
+		Timeout        int  `yaml:"timeout,omitempty"`        // Client connection timeout in seconds. 0 for indefinite
 	} `yaml:"messenger"`
 
 	Home         string   `yaml:"home"`         // application home directory. Default is parent of executable.
@@ -89,7 +97,10 @@ func CreateDefaultHubConfig(homeFolder string) *HubConfig {
 	// config.Messenger.ClientCertFile = certsetup.ClientCertFile
 	// config.Messenger.ClientKeyFile = certsetup.ClientKeyFile
 	config.Messenger.Address = "localhost"
-	config.Messenger.Port = DefaultPort
+	config.Messenger.ClientPortMqtt = DefaultClientPortMqtt
+	config.Messenger.ClientPortWS = DefaultClientPortWS
+	config.Messenger.PluginPortMqtt = DefaultPluginPortMqtt
+	config.Messenger.PluginPortWS = DefaultPluginPortWS
 	config.Logging.Loglevel = "warning"
 	// config.Logging.LogFile = path.Join(homeFolder, "logs/"+HubLogFile)
 	config.Logging.LogFile = path.Join(homeFolder, "./logs/"+HubLogFile)

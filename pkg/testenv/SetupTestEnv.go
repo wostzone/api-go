@@ -23,21 +23,49 @@ log_type warning
 log_type information
 log_dest stdout
 persistence false
+#acl_file {{.homeFolder}}/config/mosquitto.acl
 
-# Plugin authentication MQTT over TLS/SSL with client certificate
-listener {{.port}}
+
+#--- Consumers authenticate using a password
+# MQTT over TLS/SSL
+listener {{.clientPortMqtt}}
+require_certificate false
+tls_version tlsv1.2
 cafile {{.homeFolder}}/certs/ca.crt
 keyfile {{.homeFolder}}/certs/hub.key
 certfile {{.homeFolder}}/certs/hub.crt
+# Password Authentication for users
+#password_file {{.homeFolder}}/config/mosquitto-passwd
+
+
+# WebSockets over TLS/SSL
+listener {{.clientPortWS}}
+protocol websockets
+require_certificate false
+tls_version tlsv1.2
+cafile {{.homeFolder}}/certs/ca.crt
+keyfile {{.homeFolder}}/certs/hub.key
+certfile {{.homeFolder}}/certs/hub.crt
+# Password Authentication for users
+#password_file {{.homeFolder}}/config/mosquitto-passwd
+
+
+#--- Plugins authenticate using client certificate
+# Plugin authentication MQTT over TLS/SSL with client certificate
+listener {{.pluginPortMqtt}}
 require_certificate true
 tls_version tlsv1.2
-
-# Thing and Consumer authentication MQTT over TLS/SSL with login and password
-listener 33101
 cafile {{.homeFolder}}/certs/ca.crt
 keyfile {{.homeFolder}}/certs/hub.key
 certfile {{.homeFolder}}/certs/hub.crt
-require_certificate false
+
+# Thing and Consumer authentication MQTT over TLS/SSL with login and password
+listener {{.pluginPortWS}}
+protocol websockets
+require_certificate true
+cafile {{.homeFolder}}/certs/ca.crt
+keyfile {{.homeFolder}}/certs/hub.key
+certfile {{.homeFolder}}/certs/hub.crt
 # password_file ./config/mosquitto-passwd.txt
 tls_version tlsv1.2
 `
@@ -48,8 +76,11 @@ func CreateMosquittoConf(port int, homeFolder string) string {
 	var msg bytes.Buffer
 
 	params := map[string]string{
-		"homeFolder": homeFolder,
-		"port":       fmt.Sprint(port),
+		"homeFolder":     homeFolder,
+		"clientPortMqtt": fmt.Sprint(port),
+		"clientPortWS":   fmt.Sprint(port + 1), // FIXME, not like this :(
+		"pluginPortMqtt": fmt.Sprint(port + 2),
+		"pluginPortWS":   fmt.Sprint(port + 3),
 	}
 	tpl, err := template.New("").Parse(mqConfigTemplate)
 	_ = err
@@ -66,12 +97,12 @@ func CreateMosquittoConf(port int, homeFolder string) string {
 //
 // Run TeardownTestEnv() to end the mosquitto broker
 //  homeFolder is the home directory to run from
-//  port is the port to listen on, default (0) is 33100
+//  mqttPort is the port to listen on, default (0) is 33100
 // Returns the mosquitto process
-func Setup(homeFolder string, port int) (mqCmd *exec.Cmd) {
+func Setup(homeFolder string, mqttPort int) (mqCmd *exec.Cmd) {
 
-	if port == 0 {
-		port = 33100
+	if mqttPort == 0 {
+		mqttPort = 33100 // must match hub.yaml
 	}
 	certsFolder := path.Join(homeFolder, "certs")
 	// configFolder := path.Join(homeFolder, "config")
@@ -82,7 +113,7 @@ func Setup(homeFolder string, port int) (mqCmd *exec.Cmd) {
 	// mqCmd = mosquitto.Launch(mosqConfigPath)
 
 	// mosquitto must be in the path to execute
-	mosqConf := CreateMosquittoConf(port, homeFolder)
+	mosqConf := CreateMosquittoConf(mqttPort, homeFolder)
 	mosqConfigPath := path.Join("/tmp", mosquittoConfigFile)
 	err := ioutil.WriteFile(mosqConfigPath, []byte(mosqConf), 0644)
 	if err != nil {
