@@ -1,5 +1,5 @@
-// Package plugin with functions to assist plugins
-package plugin
+// Package hubclient with functions to assist plugins
+package hubclient
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 )
 
 // WaitForSignal waits until a TERM or INT signal is received
+// Intended for use by hub clients or plugins to run until the app is done
 func WaitForSignal() {
 
 	// catch all signals since not explicitly listing

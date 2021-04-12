@@ -2,7 +2,6 @@ package mqttclient_test
 
 import (
 	"os"
-	"os/exec"
 	"path"
 	"sync"
 	"testing"
@@ -29,7 +28,7 @@ const TEST_TOPIC = "test"
 const mosquittoConfigFile = "mosquitto-test.conf"
 const testPluginID = "test-user"
 
-var mosquittoCmd *exec.Cmd
+// var mosquittoCmd *exec.Cmd
 
 // setup - launch mosquitto
 func TestMain(m *testing.M) {
@@ -40,7 +39,11 @@ func TestMain(m *testing.M) {
 	configFolder := path.Join(home, "config")
 	certsetup.CreateCertificates("localhost", certsFolder)
 	mosqConfigPath := path.Join(configFolder, mosquittoConfigFile)
-	mosquittoCmd = mosquitto.Launch(mosqConfigPath)
+
+	mosquittoCmd, err := mosquitto.Launch(mosqConfigPath)
+	if err != nil {
+		logrus.Fatalf("Unable to setup mosquitto: %s", err)
+	}
 
 	result := m.Run()
 	mosquittoCmd.Process.Kill()

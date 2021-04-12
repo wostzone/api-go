@@ -1,4 +1,4 @@
-package plugin_test
+package hubclient_test
 
 import (
 	"os"
@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wostzone/hubapi/pkg/plugin"
+	"github.com/wostzone/hubapi/pkg/hubclient"
 )
 
 func TestWaitForSignal(t *testing.T) {
 	m := sync.Mutex{}
 	var waitCompleted = false
 	go func() {
-		plugin.WaitForSignal()
+		hubclient.WaitForSignal()
 		m.Lock()
 		waitCompleted = true
 		m.Unlock()
