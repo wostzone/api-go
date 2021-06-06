@@ -1,19 +1,14 @@
 package mqttclient_test
 
 import (
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
-	"io/ioutil"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/wostzone/hubapi-go/api"
 	"github.com/wostzone/hubapi-go/internal/mqttclient"
-	"github.com/wostzone/hubapi-go/pkg/certsetup"
 	"github.com/wostzone/hubapi-go/pkg/td"
 )
 
@@ -247,44 +242,44 @@ func TestSubscribeAll(t *testing.T) {
 	pluginClient.Stop()
 }
 
-func TestRequestProvisioning(t *testing.T) {
-	pluginID := "plugin1"
-	deviceID := "thing1"
-	thingID := td.CreateThingID(zone, deviceID, api.DeviceTypeSensor)
+// func TestRequestProvisioning(t *testing.T) {
+// 	pluginID := "plugin1"
+// 	deviceID := "thing1"
+// 	thingID := td.CreateThingID(zone, deviceID, api.DeviceTypeSensor)
 
-	// setup a provisioning server
-	pluginClient := mqttclient.NewMqttHubPluginClient(
-		pluginID, mqttTestConsumerConnection, mqttTestCaCertFile, mqttTestClientCertFile, mqttTestClientKeyFile)
-	err := pluginClient.Start()
-	require.NoError(t, err)
+// 	// setup a provisioning server
+// 	pluginClient := mqttclient.NewMqttHubPluginClient(
+// 		pluginID, mqttTestConsumerConnection, mqttTestCaCertFile, mqttTestClientCertFile, mqttTestClientKeyFile)
+// 	err := pluginClient.Start()
+// 	require.NoError(t, err)
 
-	caCertPEM, _ := ioutil.ReadFile(mqttTestCaCertFile)
-	caCertBlock, _ := pem.Decode(caCertPEM)
-	caCert, err := x509.ParseCertificate(caCertBlock.Bytes)
-	caKeyPEM, _ := ioutil.ReadFile(mqttTestCaKeyFile)
-	caKeyBlock, _ := pem.Decode(caKeyPEM)
-	caPrivKey, err := x509.ParsePKCS1PrivateKey(caKeyBlock.Bytes)
+// 	caCertPEM, _ := ioutil.ReadFile(mqttTestCaCertFile)
+// 	caCertBlock, _ := pem.Decode(caCertPEM)
+// 	caCert, err := x509.ParseCertificate(caCertBlock.Bytes)
+// 	caKeyPEM, _ := ioutil.ReadFile(mqttTestCaKeyFile)
+// 	caKeyBlock, _ := pem.Decode(caKeyPEM)
+// 	caPrivKey, err := x509.ParsePKCS1PrivateKey(caKeyBlock.Bytes)
 
-	pluginClient.SubscribeToProvisionRequest(func(thingID string, csrPEM []byte, sender string) {
-		certPEM, err := certsetup.SignCertificate(csrPEM, caCert, caPrivKey, time.Second)
-		assert.NoError(t, err)
-		pluginClient.PublishProvisionResponse(thingID, certPEM)
-	})
+// 	pluginClient.SubscribeToProvisionRequest(func(thingID string, csrPEM []byte, sender string) {
+// 		certPEM, err := certsetup.SignCertificate(csrPEM, caCert, caPrivKey, time.Second)
+// 		assert.NoError(t, err)
+// 		pluginClient.PublishProvisionResponse(thingID, certPEM)
+// 	})
 
-	// create a provisioning request for a thing
-	thingClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", "")
-	err = thingClient.Start()
-	assert.NoError(t, err)
+// 	// create a provisioning request for a thing
+// 	thingClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", "")
+// 	err = thingClient.Start()
+// 	assert.NoError(t, err)
 
-	thingKeyPEM, _ := ioutil.ReadFile(mqttTestClientKeyFile)
-	thingKeyBlock, _ := pem.Decode(thingKeyPEM)
-	thingPrivKey, err := x509.ParsePKCS1PrivateKey(thingKeyBlock.Bytes)
-	csrPEM, err := certsetup.CreateCSR(thingPrivKey, thingID)
-	assert.NoError(t, err)
-	assert.NotNil(t, csrPEM)
-	err = thingClient.PublishProvisionRequest(thingID, csrPEM)
-	assert.NoError(t, err)
+// 	thingKeyPEM, _ := ioutil.ReadFile(mqttTestClientKeyFile)
+// 	thingKeyBlock, _ := pem.Decode(thingKeyPEM)
+// 	thingPrivKey, err := x509.ParsePKCS1PrivateKey(thingKeyBlock.Bytes)
+// 	csrPEM, err := certsetup.CreateDeviceCSR(thingPrivKey, thingID)
+// 	assert.NoError(t, err)
+// 	assert.NotNil(t, csrPEM)
+// 	err = thingClient.PublishProvisionRequest(thingID, csrPEM)
+// 	assert.NoError(t, err)
 
-	thingClient.Stop()
-	pluginClient.Stop()
-}
+// 	thingClient.Stop()
+// 	pluginClient.Stop()
+// }

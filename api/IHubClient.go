@@ -3,12 +3,12 @@ package api
 
 // Message types to receive
 const (
-	MessageTypeAction    = "action"
-	MessageTypeConfig    = "config" // update property config
-	MessageTypeEvent     = "event"
-	MessageTypeTD        = "td"
-	MessageTypeValues    = "values"    // receive property values
-	MessageTypeProvision = "provision" // receive a provision request message
+	MessageTypeAction = "action"
+	MessageTypeConfig = "config" // update property config
+	MessageTypeEvent  = "event"
+	MessageTypeTD     = "td"
+	MessageTypeValues = "values" // receive property values
+	// MessageTypeProvision = "provision" // receive a provision request message
 )
 
 // ThingTD contains the Thing Description document
@@ -70,7 +70,7 @@ type IHubClient interface {
 	//  waitSec defines how many seconds to wait for a response
 	// returns a PEM encoded signed certificate used for authentication, or a response 'timeout'.
 	// If timeout is false and no certificate is received, the request was denied.
-	RequestProvisioning(thingID string, csrPEM []byte, waitSec uint) (certPEM []byte, timeout bool)
+	// RequestProvisioning(thingID string, csrPEM []byte, waitSec uint) (certPEM []byte, timeout bool)
 
 	// Start the client connection with the Hub
 	Start() error

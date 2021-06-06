@@ -13,6 +13,8 @@ import (
 	"gopkg.in/square/go-jose.v2"
 )
 
+const privKeyPemFile = "../../test/certs/privKey.pem"
+
 type TestObjectWithSender struct {
 	Field1 string `json:"field1"`
 	Field2 int    `json:"field2"`
@@ -40,8 +42,18 @@ var testObject2 = TestObjectNoSender{
 	// Sender: Pub1Address,
 }
 
+func TestSaveLoadPrivKey(t *testing.T) {
+	privKey := signing.CreateECDSAKeys()
+	err := signing.SavePrivateKeyPem(privKey, privKeyPemFile)
+	assert.NoError(t, err)
+
+	privKey2, err := signing.LoadPrivateKeyPem(privKeyPemFile)
+	assert.NoError(t, err)
+	assert.NotNil(t, privKey2)
+}
+
 func TestEcdsaSigning(t *testing.T) {
-	privKey := signing.CreateAsymKeys()
+	privKey := signing.CreateECDSAKeys()
 	payload, _ := json.Marshal(testObject)
 
 	sig := signing.CreateEcdsaSignature(payload, privKey)
@@ -61,14 +73,14 @@ func TestEcdsaSigning(t *testing.T) {
 	sig = signing.CreateEcdsaSignature(payload, privKey)
 	err = signing.VerifyEcdsaSignature(payload, sig, nil)
 	assert.Error(t, err)
-	newKey := signing.CreateAsymKeys()
+	newKey := signing.CreateECDSAKeys()
 	err = signing.VerifyEcdsaSignature(payload, sig, &newKey.PublicKey)
 	assert.Error(t, err)
 
 }
 
 func TestJWSSigning(t *testing.T) {
-	privKey := signing.CreateAsymKeys()
+	privKey := signing.CreateECDSAKeys()
 
 	payload1, err := json.Marshal(testObject)
 	assert.NoErrorf(t, err, "Serializing node1 failed")
@@ -82,7 +94,7 @@ func TestJWSSigning(t *testing.T) {
 }
 
 func TestSigningPerformance(t *testing.T) {
-	privKey := signing.CreateAsymKeys()
+	privKey := signing.CreateECDSAKeys()
 
 	payload1, err := json.Marshal(testObject)
 	assert.NoErrorf(t, err, "Serializing node1 failed")
@@ -142,7 +154,7 @@ func TestSigningPerformance(t *testing.T) {
 
 // Test the sender verification
 func TestVerifySender(t *testing.T) {
-	privKey := signing.CreateAsymKeys()
+	privKey := signing.CreateECDSAKeys()
 
 	payload1, err := json.Marshal(testObject)
 	assert.NoErrorf(t, err, "Serializing node1 failed")
@@ -208,7 +220,7 @@ func TestVerifySender(t *testing.T) {
 	assert.Errorf(t, err, "Verification with non json payload should not succeed")
 
 	// different public key
-	newKeys := signing.CreateAsymKeys()
+	newKeys := signing.CreateECDSAKeys()
 	isSigned, err = signing.VerifySenderJWSSignature(sig2, &received, func(address string) *ecdsa.PublicKey {
 		// return the public key of this publisher
 		return &newKeys.PublicKey

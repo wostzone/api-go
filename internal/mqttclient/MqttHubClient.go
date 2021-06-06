@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/wostzone/hubapi-go/api"
@@ -34,36 +33,36 @@ type MqttHubClient struct {
 
 // RequestProvisioning sends a request to (re)provision this device
 // This subscribes to a response and waits a few seconds
-func (client *MqttHubClient) RequestProvisioning(thingID string, csrPEM []byte, waitSec uint,
-) (certPEM []byte, timeout bool) {
-	done := make(chan bool, 1)
+// func (client *MqttHubClient) RequestProvisioning(thingID string, csrPEM []byte, waitSec uint,
+// ) (certPEM []byte, timeout bool) {
+// 	done := make(chan bool, 1)
 
-	// listen for the response
-	// TODO: MQTT 5 supports request-response
-	respTopic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", thingID)
-	client.mqttClient.Subscribe(respTopic, func(address string, message []byte) {
-		certPEM = message
-		timeout = false
-		done <- true
-	})
+// 	// listen for the response
+// 	// TODO: MQTT 5 supports request-response
+// 	respTopic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", thingID)
+// 	client.mqttClient.Subscribe(respTopic, func(address string, message []byte) {
+// 		certPEM = message
+// 		timeout = false
+// 		done <- true
+// 	})
 
-	reqTopic := strings.ReplaceAll(api.TopicProvisionRequest, "{id}", thingID)
-	err := client.mqttClient.Publish(reqTopic, csrPEM)
-	if err != nil {
-		return nil, true
-	}
+// 	reqTopic := strings.ReplaceAll(api.TopicProvisionRequest, "{id}", thingID)
+// 	err := client.mqttClient.Publish(reqTopic, csrPEM)
+// 	if err != nil {
+// 		return nil, true
+// 	}
 
-	// wait for response or timeout
-	select {
-	case <-done:
-		logrus.Infof("RequestProvisioning: Received response")
-	case <-time.After(time.Second * time.Duration(waitSec)):
-		logrus.Infof("RequestProvisioning: timeout after %d seconds", waitSec)
-		timeout = true
-	}
-	client.mqttClient.Unsubscribe(respTopic)
-	return certPEM, timeout
-}
+// 	// wait for response or timeout
+// 	select {
+// 	case <-done:
+// 		logrus.Infof("RequestProvisioning: Received response")
+// 	case <-time.After(time.Second * time.Duration(waitSec)):
+// 		logrus.Infof("RequestProvisioning: timeout after %d seconds", waitSec)
+// 		timeout = true
+// 	}
+// 	client.mqttClient.Unsubscribe(respTopic)
+// 	return certPEM, timeout
+// }
 
 // Start the client connection
 func (client *MqttHubClient) Start() error {
@@ -129,21 +128,21 @@ func (client *MqttHubClient) PublishTD(thingID string, td api.ThingTD) error {
 
 // PublishProvisionRequest publish a request for provisioning
 // Intended to by used by Thing devices to provision with a hub
-func (client *MqttHubClient) PublishProvisionRequest(thingID string, csrPEM []byte) error {
-	topic := strings.ReplaceAll(api.TopicProvisionRequest, "{id}", thingID)
-	message, _ := json.Marshal(csrPEM)
-	err := client.mqttClient.Publish(topic, message)
-	return err
-}
+// func (client *MqttHubClient) PublishProvisionRequest(thingID string, csrPEM []byte) error {
+// 	topic := strings.ReplaceAll(api.TopicProvisionRequest, "{id}", thingID)
+// 	message, _ := json.Marshal(csrPEM)
+// 	err := client.mqttClient.Publish(topic, message)
+// 	return err
+// }
 
 // PublishProvisionResponse publish a response to a provisioning request
 // Intended to by used by plugins that handle provisioning
-func (client *MqttHubClient) PublishProvisionResponse(thingID string, response []byte) error {
-	topic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", thingID)
-	message, _ := json.Marshal(response)
-	err := client.mqttClient.Publish(topic, message)
-	return err
-}
+// func (client *MqttHubClient) PublishProvisionResponse(thingID string, response []byte) error {
+// 	topic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", thingID)
+// 	message, _ := json.Marshal(response)
+// 	err := client.mqttClient.Publish(topic, message)
+// 	return err
+// }
 
 // Subscribe subscribes to messages from Things
 func (client *MqttHubClient) Subscribe(
@@ -254,32 +253,32 @@ func (client *MqttHubClient) SubscribeToPropertyValues(
 
 // SubscribeToProvisionRequest receives requests for provisioning
 // Intended to by used by plugins that handle provisioning
-func (client *MqttHubClient) SubscribeToProvisionRequest(
-	handler func(thingID string, csrPEM []byte, sender string)) {
+// func (client *MqttHubClient) SubscribeToProvisionRequest(
+// 	handler func(thingID string, csrPEM []byte, sender string)) {
 
-	topic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", "+")
+// 	topic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", "+")
 
-	// local copy of arguments
-	subscribedHandler := handler
-	client.mqttClient.Subscribe(topic, func(address string, message []byte) {
-		// FIXME: determine sender and format for property values message
-		sender := ""
-		// FIXME: don't depend on topic format
-		topicParts := strings.Split(topic, "/")
-		if len(topicParts) < 2 {
-			logrus.Infof("ProvisionRequest: Topic %s invalid", topic)
-			return
-		}
-		thingID := topicParts[1]
-		var csrPEM []byte
-		err := json.Unmarshal(message, &csrPEM)
-		if err != nil {
-			logrus.Infof("ProvisionRequest: topic %s, csrPEM unmarshal error: %s", topic, err)
-		} else {
-			subscribedHandler(thingID, csrPEM, sender)
-		}
-	})
-}
+// 	// local copy of arguments
+// 	subscribedHandler := handler
+// 	client.mqttClient.Subscribe(topic, func(address string, message []byte) {
+// 		// FIXME: determine sender and format for property values message
+// 		sender := ""
+// 		// FIXME: don't depend on topic format
+// 		topicParts := strings.Split(topic, "/")
+// 		if len(topicParts) < 2 {
+// 			logrus.Infof("ProvisionRequest: Topic %s invalid", topic)
+// 			return
+// 		}
+// 		thingID := topicParts[1]
+// 		var csrPEM []byte
+// 		err := json.Unmarshal(message, &csrPEM)
+// 		if err != nil {
+// 			logrus.Infof("ProvisionRequest: topic %s, csrPEM unmarshal error: %s", topic, err)
+// 		} else {
+// 			subscribedHandler(thingID, csrPEM, sender)
+// 		}
+// 	})
+// }
 
 // SubscribeTD subscribes to receive updates to TDs from the WoST Hub
 //  thingID is the full ID of a thing, or "" to subscribe to all thingIDs

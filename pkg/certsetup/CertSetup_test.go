@@ -12,24 +12,31 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wostzone/hubapi-go/pkg/certsetup"
+	"github.com/wostzone/hubapi-go/pkg/signing"
 )
 
 func TestTLSCertificateGeneration(t *testing.T) {
 	hostname := "127.0.0.1"
 
 	// test creating ca and server certificates
-	caCertPEM, caKeyPEM := certsetup.CreateWoSTCA()
+	caCertPEM, caKeyPEM := certsetup.CreateHubCA()
 	require.NotNilf(t, caCertPEM, "Failed creating CA certificate")
 	caCert, err := tls.X509KeyPair(caCertPEM, caKeyPEM)
 	_ = caCert
 	require.NoErrorf(t, err, "Failed parsing CA certificate")
 
-	clientCertPEM, clientKeyPEM, err := certsetup.CreateClientCert(caCertPEM, caKeyPEM, hostname)
+	clientKey := signing.CreateECDSAKeys()
+	clientKeyPEM := signing.PrivateKeyToPem(clientKey)
+	clientPubPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
+	clientCertPEM, err := certsetup.CreateClientCert(hostname, clientPubPEM, caCertPEM, caKeyPEM)
 	require.NoErrorf(t, err, "Creating certificates failed:")
 	require.NotNilf(t, clientCertPEM, "Failed creating client certificate")
 	require.NotNilf(t, clientKeyPEM, "Failed creating client key")
 
-	serverCertPEM, serverKeyPEM, err := certsetup.CreateHubCert(caCertPEM, caKeyPEM, hostname)
+	serverKey := signing.CreateECDSAKeys()
+	serverKeyPEM := signing.PrivateKeyToPem(serverKey)
+	serverPubPEM := signing.PublicKeyToPem(&serverKey.PublicKey)
+	serverCertPEM, err := certsetup.CreateHubCert(hostname, serverPubPEM, caCertPEM, caKeyPEM)
 	require.NoErrorf(t, err, "Failed creating server certificate")
 	// serverCert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
 	require.NoErrorf(t, err, "Failed creating server certificate")
@@ -59,7 +66,7 @@ func TestTLSCertificateGeneration(t *testing.T) {
 
 func TestBadCert(t *testing.T) {
 	hostname := "127.0.0.1"
-	caCertPEM, caKeyPEM := certsetup.CreateWoSTCA()
+	caCertPEM, caKeyPEM := certsetup.CreateHubCA()
 	// caCertPEM = pem.Encode( )[]byte{1, 2, 3}
 
 	certPEMBuffer := new(bytes.Buffer)
@@ -69,10 +76,14 @@ func TestBadCert(t *testing.T) {
 	})
 	caCertPEM = certPEMBuffer.Bytes()
 
-	clientCertPEM, clientKeyPEM, err := certsetup.CreateClientCert(caCertPEM, caKeyPEM, hostname)
+	clientKey := signing.CreateECDSAKeys()
+	clientKeyPEM := signing.PrivateKeyToPem(clientKey)
+	clientPubPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
+	clientCertPEM, err := certsetup.CreateClientCert(hostname, clientPubPEM, caCertPEM, caKeyPEM)
+
+	assert.NotNilf(t, clientKeyPEM, "Missing client key")
 	assert.Errorf(t, err, "Creating certificates should fail")
 	assert.Nilf(t, clientCertPEM, "Created client certificate")
-	assert.Nilf(t, clientKeyPEM, "Created client key")
 }
 
 func TestCreateCerts(t *testing.T) {

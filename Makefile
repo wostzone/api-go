@@ -9,6 +9,7 @@ test: FORCE ## Run tests (todo fix this)
 
 clean: ## Clean distribution files
 	go clean
+	go mod tidy
 	rm -f test/certs/*
 	rm -f test/logs/*
 

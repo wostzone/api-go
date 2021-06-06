@@ -1,183 +1,63 @@
-// Package certsetup with creation of self signed certificate chain
+// Package certsetup with creation of self signed certificate chain using ECDSA signing
 // Credits: https://gist.github.com/shaneutt/5e1995295cff6721c89a71d13a71c251
 package certsetup
 
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/wostzone/hubapi-go/pkg/signing"
 )
 
-const keySize = 2048 // 4096
-const caDurationYears = 10
+// const keySize = 2048 // 4096
+const caDefaultValidityDuration = time.Hour * 24 * 364 * 10 // 10 years
+const caTemporaryValidityDuration = time.Hour * 24 * 3      // 3 days
 
 // const certDurationYears = 10
 const DefaultCertDuration = time.Hour * 24 * 365
+const TempCertDuration = time.Hour * 24 * 1
 
-// Standard client and server certificate filenames
+// Standard client and server certificate filenames all stored in PEM format
 const (
-	CaCertFile     = "ca.crt" // CA that signed the server and client certificates
-	CaKeyFile      = "ca.key"
-	ServerCertFile = "hub.crt"
-	ServerKeyFile  = "hub.key"
-	ClientCertFile = "client.crt"
-	ClientKeyFile  = "client.key"
+	CaCertFile     = "caCert.pem" // CA that signed the server and client certificates
+	CaKeyFile      = "caKey.pem"
+	ServerCertFile = "hubCert.pem"
+	ServerKeyFile  = "hubKey.pem"
+	ClientCertFile = "clientCert.pem"
+	ClientKeyFile  = "clientKey.pen"
 )
 
-// func GenCARoot() (*x509.Certificate, []byte, *rsa.PrivateKey) {
-// 	if _, err := os.Stat("someFile"); err == nil {
-// 		//read PEM and cert from file
-// 	}
-// 	var rootTemplate = x509.Certificate{
-// 		SerialNumber: big.NewInt(1),
-// 		Subject: pkix.Name{
-// 			Country:      []string{"SE"},
-// 			Organization: []string{"Company Co."},
-// 			CommonName:   "Root CA",
-// 		},
-// 		NotBefore:             time.Now().Add(-10 * time.Second),
-// 		NotAfter:              time.Now().AddDate(10, 0, 0),
-// 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-// 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-// 		BasicConstraintsValid: true,
-// 		IsCA:                  true,
-// 		MaxPathLen:            2,
-// 		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
-// 	}
-// 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	rootCert, rootPEM := genCert(&rootTemplate, &rootTemplate, &priv.PublicKey, priv)
-// 	return rootCert, rootPEM, priv
-// }
-
-// CreateClientCert creates a client side certificate, signed by the CA
-func CreateClientCert(caCertPEM []byte, caKeyPEM []byte, hostname string) (pkPEM []byte, certPEM []byte, err error) {
-	// The device gets a new private key
-	clientKey, err := rsa.GenerateKey(rand.Reader, keySize)
-	if err != nil {
-		return nil, nil, err
-	}
-	// We need the CA private key and certificate
-	caPrivKeyBlock, _ := pem.Decode(caKeyPEM)
-	caPrivKey, err := x509.ParsePKCS1PrivateKey(caPrivKeyBlock.Bytes)
-	caCertBlock, _ := pem.Decode(caCertPEM)
-	if caCertBlock == nil {
-		return nil, nil, err
-	}
-	caCert, err := x509.ParseCertificate(caCertBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// create a CSR for this client
-	csrPEM, err := CreateCSR(clientKey, hostname)
-	clientCertPEM, err := SignCertificate(csrPEM, caCert, caPrivKey, DefaultCertDuration)
-
-	// // hostname = "localhost"
-	// // set up our server certificate
-	// template := &x509.Certificate{
-	// 	SerialNumber: big.NewInt(2021),
-	// 	Subject: pkix.Name{
-	// 		Organization:  []string{"WoST"},
-	// 		Country:       []string{"CA"},
-	// 		Province:      []string{"BC"},
-	// 		Locality:      []string{"WoST Client"},
-	// 		StreetAddress: []string{""},
-	// 		PostalCode:    []string{""},
-	// 		CommonName:    hostname,
-	// 	},
-	// 	NotBefore:    time.Now(),
-	// 	NotAfter:     time.Now().AddDate(certDurationYears, 0, 0),
-	// 	SubjectKeyId: []byte{1, 2, 3, 4, 6},
-	// 	ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	// 	KeyUsage:     x509.KeyUsageDigitalSignature,
-	// }
-
-	// clientCertBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, &clientKey.PublicKey, caPrivKey)
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
-
-	// clientCertPEMBuffer := new(bytes.Buffer)
-	// pem.Encode(clientCertPEMBuffer, &pem.Block{
-	// 	Type:  "CERTIFICATE",
-	// 	Bytes: clientCertBytes,
-	// })
-
-	clientKeyPEMBuffer := new(bytes.Buffer)
-	pem.Encode(clientKeyPEMBuffer, &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(clientKey),
-	})
-
-	return clientCertPEM, clientKeyPEMBuffer.Bytes(), nil
-}
-
-// CreateCSR creates a certificate signing request using the device's private key.
-// The CSR is used in the provisioning process to obtain a certificate that is signed
-// by the CA (certificate authority) of the server. The signed certificate is used
-// by the device to authenticate and identify itself with the server, for example a message bus.
-//
-// The same private key of the device must be used when connecting to the server with
-// the certificate that is received for this CSR.
-//  privKey is the private key of the device.
-//  deviceThingID contains the ThingID that represents the device.
-// This returns the CSR in PEM format
-func CreateCSR(devicePrivKey *rsa.PrivateKey, deviceThingID string) (csrPEM []byte, err error) {
-	// var oidEmailAddress = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 1}
-	subj := pkix.Name{
-		CommonName: deviceThingID,
-		Country:    []string{"CA"},
-		Province:   []string{"BC"},
-		Locality:   []string{"WoSTZone"},
-		// StreetAddress: []string{""},
-		// PostalCode:    []string{""},
-		Organization:       []string{"WoST"},
-		OrganizationalUnit: []string{"Client"},
-		// extended attributes
-		// ExtraNames: []pkix.AttributeTypeAndValue{
-		// 	{
-		// 		Type: oidEmailAddress,
-		// 		Value: asn1.RawValue{
-		// 			Tag:   asn1.TagIA5String,
-		// 			Bytes: []byte(emailAddress),
-		// 		},
-		// 	},
-		// },
-	}
-
-	template := x509.CertificateRequest{
-		Subject:            subj,
-		SignatureAlgorithm: x509.SHA256WithRSA,
-	}
-
-	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &template, devicePrivKey)
-	if err != nil {
-		return nil, err
-	}
-	csrPEMBuffer := new(bytes.Buffer)
-	pem.Encode(csrPEMBuffer, &pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrBytes})
-
-	return csrPEMBuffer.Bytes(), err
-}
-
-// Create the CA, server and client certificates into the given folder
+// CreateCertificateBundle is a convenience function to create the Hub CA, server and (plugin) client
+// certificates into the given folder. Intended for testing.
 func CreateCertificateBundle(hostname string, certFolder string) error {
-	caCertPEM, caKeyPEM := CreateWoSTCA()
-	serverCertPEM, serverKeyPEM, _ := CreateHubCert(caCertPEM, caKeyPEM, hostname)
-	clientCertPEM, clientKeyPEM, _ := CreateClientCert(caCertPEM, caKeyPEM, hostname)
+	caCertPEM, caKeyPEM := CreateHubCA()
+
+	serverKey := signing.CreateECDSAKeys()
+	serverKeyPEM := signing.PrivateKeyToPem(serverKey)
+	serverPubPEM := signing.PublicKeyToPem(&serverKey.PublicKey)
+	serverCertPEM, err := CreateHubCert(hostname, serverPubPEM, caCertPEM, caKeyPEM)
+	if err != nil {
+		logrus.Fatalf("CreateCertificateBundle failed: %s", err)
+	}
+
+	clientKey := signing.CreateECDSAKeys()
+	clientKeyPEM := signing.PrivateKeyToPem(clientKey)
+	clientPubKeyPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
+	clientCertPEM, err := CreateClientCert(hostname, clientPubKeyPEM, caCertPEM, caKeyPEM)
+	if err != nil {
+		logrus.Fatalf("CreateCertificateBundle failed: %s", err)
+	}
 
 	caCertPath := path.Join(certFolder, CaCertFile)
 	caKeyPath := path.Join(certFolder, CaKeyFile)
@@ -186,7 +66,7 @@ func CreateCertificateBundle(hostname string, certFolder string) error {
 	clientCertPath := path.Join(certFolder, ClientCertFile)
 	clientKeyPath := path.Join(certFolder, ClientKeyFile)
 
-	err := ioutil.WriteFile(caKeyPath, caKeyPEM, 0600)
+	err = ioutil.WriteFile(caKeyPath, caKeyPEM, 0600)
 	if err != nil {
 		logrus.Fatalf("CreateCertificates failed writing. Unable to continue: %s", err)
 	}
@@ -198,172 +78,261 @@ func CreateCertificateBundle(hostname string, certFolder string) error {
 	return nil
 }
 
-// CreateHubCert creates Wost message bus server key and certificate
-// TODO: replace with create CSR and SignCertificate from CSR
-func CreateHubCert(caCertPEM []byte, caKeyPEM []byte, hostname string) (pkPEM []byte, certPEM []byte, err error) {
-	// We need the CA key and certificate
-	caPrivKeyBlock, _ := pem.Decode(caKeyPEM)
-	caPrivKey, err := x509.ParsePKCS1PrivateKey(caPrivKeyBlock.Bytes)
-	certBlock, _ := pem.Decode(caCertPEM)
-	caCert, err := x509.ParseCertificate(certBlock.Bytes)
+// CreateClientCert creates a client side Hub certificate for mutual authentication from client's public key
+// This generates a certificate using the client's public key in PEM format
+//  clientID used as the CommonName
+//  clientPubKeyPEM with the client's public key
+//  caCertPEM CA's certificate in PEM format.
+//  caKeyPEM CA's ECDSA key used in signing.
+// Returns the signed certificate or error
+func CreateClientCert(clientID string, clientPubKeyPEM, caCertPEM []byte, caKeyPEM []byte) (certPEM []byte, err error) {
+	var certDuration = DefaultCertDuration
+
+	caPrivKey, err := signing.PrivateKeyFromPem(string(caKeyPEM))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	if hostname == "" {
-		hostname = "localhost"
+	caCert, err := CertFromPEM(caCertPEM)
+	if err != nil {
+		return nil, err
 	}
-	// set up our server certificate
-	cert := &x509.Certificate{
+
+	clientPubKey := signing.PublicKeyFromPem(clientPubKeyPEM)
+
+	template := &x509.Certificate{
 		SerialNumber: big.NewInt(2021),
 		Subject: pkix.Name{
-			Organization:  []string{"WoST Zone"},
-			Country:       []string{"CA"},
-			Province:      []string{"BC"},
-			Locality:      []string{"WoST Hub"},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-			CommonName:    hostname,
+			Organization: []string{"WoST"},
+			Country:      []string{"CA"},
+			Province:     []string{"BC"},
+			Locality:     []string{"WoST Zone"},
+			CommonName:   clientID,
 		},
 		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Duration(DefaultCertDuration)),
-		// SubjectKeyId: []byte{1, 2, 3, 4, 6},   // WTF is this???
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
+		NotAfter:  time.Now().Add(time.Duration(certDuration)),
+
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		IsCA:                  false,
+		BasicConstraintsValid: true,
 	}
 
-	// If an IP address is given, then allow localhost
-	ipAddr := net.ParseIP(hostname)
-	if ipAddr != nil {
-		logrus.Infof("CreateHubCert: hostname %s is an IP address. Setting as SAN", hostname)
-		cert.IPAddresses = []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback, ipAddr}
-	}
-
-	privKey, err := rsa.GenerateKey(rand.Reader, keySize)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, &privKey.PublicKey, caPrivKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	certPEMBuffer := new(bytes.Buffer)
-	pem.Encode(certPEMBuffer, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certBytes,
-	})
-
-	privKeyPEMBuffer := new(bytes.Buffer)
-	pem.Encode(privKeyPEMBuffer, &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
-	})
-
-	return certPEMBuffer.Bytes(), privKeyPEMBuffer.Bytes(), nil
+	derCertBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, clientPubKey, caPrivKey)
+	certPEM = CertDerToPEM(derCertBytes)
+	return certPEM, err
 }
 
-// CreateWoSTCA creates WoST CA and certificate and private key for signing server certificates
+// CreateDeviceCSR creates a certificate signing request using the device's private key.
+// The CSR is used in the provisioning process to request a certificate that is signed
+// by the CA (certificate authority) of the server and contains the device's authentication ID.
+//
+//  privKey is the private key of the device.
+//  deviceID contains the unique ThingID that represents the device.
+// This returns the CSR in PEM format
+// func CreateDeviceCSR(devicePrivKey *ecdsa.PrivateKey, deviceID string) (csrPEM []byte, err error) {
+// 	// var oidEmailAddress = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 1}
+// 	subj := pkix.Name{
+// 		// CommonName: deviceThingID,
+// 		Country:  []string{"CA"},
+// 		Province: []string{"BC"},
+// 		Locality: []string{"WoSTZone"},
+// 		// StreetAddress: []string{""},
+// 		// PostalCode:    []string{""},
+// 		Organization:       []string{"WoST"},
+// 		OrganizationalUnit: []string{"Client"},
+// 	}
+
+// 	template := x509.CertificateRequest{
+// 		Subject: subj,
+// 		// SignatureAlgorithm: x509.SHA256WithRSA,
+// 		SignatureAlgorithm: x509.ECDSAWithSHA256,
+// 		ExtraExtensions: []pkix.Extension{
+// 			SubjectAltName: "RID:" + deviceID,
+// 		},
+// 	}
+
+// 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &template, devicePrivKey)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	csrPEMBuffer := new(bytes.Buffer)
+// 	pem.Encode(csrPEMBuffer, &pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrBytes})
+
+// 	return csrPEMBuffer.Bytes(), err
+// }
+
+// CreateHubCA creates WoST Hub Root CA certificate and private key for signing server certificates
 // Source: https://shaneutt.com/blog/golang-ca-and-signed-cert-go/
-func CreateWoSTCA() (certPEM []byte, keyPEM []byte) {
+// This creates a CA certificate used for signing client and server certificates.
+// CA is valid for 'caDurationYears'
+//
+//  temporary set to generate a temporary CA for one-off signing
+func CreateHubCA() (certPEM []byte, keyPEM []byte) {
+	validity := caDefaultValidityDuration
+
 	// set up our CA certificate
-	cert := &x509.Certificate{
+	// see also: https://superuser.com/questions/738612/openssl-ca-keyusage-extension
+	rootTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(2021),
 		Subject: pkix.Name{
-			Organization:  []string{"WoST Zone"},
-			Country:       []string{"CA"},
-			Province:      []string{"BC"},
-			Locality:      []string{"Project"},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-			CommonName:    "Root CA",
+			Country:      []string{"CA"},
+			Organization: []string{"WoST"},
+			Province:     []string{"BC"},
+			Locality:     []string{"WoST Zone"},
+			CommonName:   "WoST CA",
 		},
-		NotBefore:             time.Now().Add(-10 * time.Second),
-		NotAfter:              time.Now().AddDate(caDurationYears, 0, 0),
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		NotBefore: time.Now().Add(-10 * time.Second),
+		NotAfter:  time.Now().Add(validity),
+		// CA cert can be used to sign certificate and revocation lists
+		KeyUsage:    x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+
+		// This hub cert is the only CA. Don't allow intermediate CAs
 		BasicConstraintsValid: true,
 		IsCA:                  true,
-		// MaxPathLen: 2,
-		// 		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		MaxPathLen:            0,
+		MaxPathLenZero:        true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
 	}
 
 	// Create the CA private key
-	privKey, err := rsa.GenerateKey(rand.Reader, keySize)
-	if err != nil {
-		logrus.Errorf("CertSetup: Unable to create private key: %s", err)
-		return nil, nil
-	}
-
-	// PEM encode private key
-	privKeyPEMBuffer := new(bytes.Buffer)
-	pem.Encode(privKeyPEMBuffer, &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privKey),
-	})
+	privKey := signing.CreateECDSAKeys()
+	privKeyPEM := signing.PrivateKeyToPem(privKey)
 
 	// create the CA
-	caBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privKey.PublicKey, privKey)
+	caCertDer, err := x509.CreateCertificate(rand.Reader, rootTemplate, rootTemplate, &privKey.PublicKey, privKey)
 	if err != nil {
-		logrus.Errorf("CertSetup: Unable to create CA cert: %s", err)
+		logrus.Errorf("CertSetup: Unable to create WoST Hub CA cert: %s", err)
 		return nil, nil
 	}
 
+	caCertPEM := CertDerToPEM(caCertDer)
+	return caCertPEM, []byte(privKeyPEM)
+}
+
+// CreateHubCert creates Wost server certificate
+//  hosts contains one or more DNS or IP addresses to add tot he certificate. Localhost is always added
+//  pubKey is the Hub public key in PEM format
+//  caCertPEM is the CA to sign the server certificate
+// returns the signed Hub certificate in PEM format
+func CreateHubCert(hosts string, hubPublicKeyPEM []byte, caCertPEM []byte, caKeyPEM []byte) (certPEM []byte, err error) {
+	// We need the CA key and certificate
+	caPrivKey, err := signing.PrivateKeyFromPem(string(caKeyPEM))
+	if err != nil {
+		return nil, err
+	}
+	caCert, err := CertFromPEM(caCertPEM)
+	if err != nil {
+		return nil, err
+	}
+
+	hubPublicKey := signing.PublicKeyFromPem(hubPublicKeyPEM)
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(2021),
+		Subject: pkix.Name{
+			Organization: []string{"WoST"},
+			Country:      []string{"CA"},
+			Province:     []string{"BC"},
+			Locality:     []string{"WoST Zone"},
+			CommonName:   "WoST Hub",
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(time.Duration(DefaultCertDuration)),
+
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCRLSign,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		// ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		IsCA:           false,
+		MaxPathLenZero: true,
+		// BasicConstraintsValid: true,
+		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+	}
+	// determine the hosts for this hub
+	hostList := strings.Split(hosts, ",")
+	for _, h := range hostList {
+		if ip := net.ParseIP(h); ip != nil {
+			template.IPAddresses = append(template.IPAddresses, ip)
+		} else {
+			template.DNSNames = append(template.DNSNames, h)
+		}
+	}
+
+	certDer, err := x509.CreateCertificate(rand.Reader, template, caCert, hubPublicKey, caPrivKey)
+	if err != nil {
+		return nil, err
+	}
+	certPEM = CertDerToPEM(certDer)
+
+	return certPEM, nil
+}
+
+// Convert certificate DER encoding to PEM
+//  derBytes is the output of x509.CreateCertificate
+func CertDerToPEM(derCertBytes []byte) []byte {
 	// pem encode certificate
 	certPEMBuffer := new(bytes.Buffer)
 	pem.Encode(certPEMBuffer, &pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: caBytes,
+		Bytes: derCertBytes,
 	})
-	return certPEMBuffer.Bytes(), privKeyPEMBuffer.Bytes()
+	return certPEMBuffer.Bytes()
 }
 
-// Sign a certificate from a Certificate Signing Request
+// Convert a PEM certificate to x509 instance
+func CertFromPEM(certPEM []byte) (*x509.Certificate, error) {
+	caCertBlock, _ := pem.Decode(certPEM)
+	if caCertBlock == nil {
+		return nil, errors.New("CertFromPEM pem.Decode failed")
+	}
+	caCert, err := x509.ParseCertificate(caCertBlock.Bytes)
+	return caCert, err
+}
+
+// SignCSR generates a certificate from a Certificate Signing Request, signed by the CA
 // Intended to generate a client certificate from a CA for use in authenticiation
 // Thanks to https://stackoverflow.com/questions/42643048/signing-certificate-request-with-certificate-authority
 //  csrPEM contains the PEM formatted certificate signing request
 //  caCert contains the CA certificate for signing
 //  caPrivKey contains the CA private key for signing
 //  duration is the validity duration of the certificate
-func SignCertificate(csrPEM []byte, caCert *x509.Certificate, caPrivKey *rsa.PrivateKey, duration time.Duration,
-) (clientCertPEM []byte, err error) {
+// func SignCSR(csrPEM []byte, caCert *x509.Certificate, caPrivKey *ecdsa.PrivateKey, duration time.Duration,
+// ) (signedCertPEM []byte, err error) {
 
-	csrBlock, _ := pem.Decode(csrPEM)
-	csr, err := x509.ParseCertificateRequest(csrBlock.Bytes)
-	if err != nil {
-		return nil, err
-	}
+// 	csrBlock, _ := pem.Decode(csrPEM)
+// 	csr, err := x509.ParseCertificateRequest(csrBlock.Bytes)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	// check if the signature on the CSR is valid
-	// Not sure what this means exactly
-	err = csr.CheckSignature()
-	if err != nil {
-		return nil, err
-	}
+// 	// check if the signature on the CSR is valid
+// 	// Not sure what this means exactly
+// 	err = csr.CheckSignature()
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	// create client certificate template using the CSR
-	clientCRTTemplate := x509.Certificate{
-		Signature:          csr.Signature,
-		SignatureAlgorithm: csr.SignatureAlgorithm,
+// 	// create client certificate template using the CSR
+// 	clientCRTTemplate := x509.Certificate{
+// 		Signature:          csr.Signature,
+// 		SignatureAlgorithm: csr.SignatureAlgorithm,
+// 		PublicKeyAlgorithm: csr.PublicKeyAlgorithm,
+// 		PublicKey:          csr.PublicKey,
 
-		PublicKeyAlgorithm: csr.PublicKeyAlgorithm,
-		PublicKey:          csr.PublicKey,
+// 		SerialNumber: big.NewInt(2),
+// 		Issuer:       caCert.Subject,
+// 		Subject:      csr.Subject,
+// 		NotBefore:    time.Now().Add(-10 * time.Second),
+// 		NotAfter:     time.Now().Add(duration),
+// 		KeyUsage:     x509.KeyUsageDigitalSignature,
+// 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+// 	}
 
-		SerialNumber: big.NewInt(2),
-		Issuer:       caCert.Subject,
-		Subject:      csr.Subject,
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(duration),
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-
-	// create client certificate from template and CA public key
-	certRaw, err := x509.CreateCertificate(rand.Reader, &clientCRTTemplate, caCert, csr.PublicKey, caPrivKey)
-	if err != nil {
-		return nil, err
-	}
-	clientCertPEMBuffer := new(bytes.Buffer)
-	pem.Encode(clientCertPEMBuffer, &pem.Block{Type: "CERTIFICATE", Bytes: certRaw})
-	return clientCertPEMBuffer.Bytes(), nil
-}
+// 	// create client certificate from template and CA public key
+// 	certDer, err := x509.CreateCertificate(rand.Reader, &clientCRTTemplate, caCert, csr.PublicKey, caPrivKey)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	signedCertPEM = CertDerToPEM(certDer)
+// 	return signedCertPEM, nil
+// }

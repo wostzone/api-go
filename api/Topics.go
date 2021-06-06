@@ -20,7 +20,7 @@ const TopicSetConfig = TopicRoot + "/{id}/config"
 const TopicAction = TopicRoot + "/{id}/action"
 
 // TopicProvisionRequest topic requesting to privision of a thing device
-const TopicProvisionRequest = "provisioning" + "/{id}/request"
+// const TopicProvisionRequest = "provisioning" + "/{id}/request"
 
 // TopicProvisionResponse topic for privisioning of a thing device
-const TopicProvisionResponse = "provisioning" + "/{id}/response"
+// const TopicProvisionResponse = "provisioning" + "/{id}/response"

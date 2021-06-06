@@ -32,9 +32,9 @@ persistence false
 listener {{.clientPortMqtt}}
 require_certificate false
 tls_version tlsv1.2
-cafile {{.homeFolder}}/certs/ca.crt
-keyfile {{.homeFolder}}/certs/hub.key
-certfile {{.homeFolder}}/certs/hub.crt
+cafile {{.homeFolder}}/certs/caCert.pem
+keyfile {{.homeFolder}}/certs/hubKey.pem
+certfile {{.homeFolder}}/certs/hubCert.pem
 # Password Authentication for users
 #password_file {{.homeFolder}}/config/mosquitto-passwd
 
@@ -44,9 +44,9 @@ listener {{.clientPortWS}}
 protocol websockets
 require_certificate false
 tls_version tlsv1.2
-cafile {{.homeFolder}}/certs/ca.crt
-keyfile {{.homeFolder}}/certs/hub.key
-certfile {{.homeFolder}}/certs/hub.crt
+cafile {{.homeFolder}}/certs/caCert.pem
+keyfile {{.homeFolder}}/certs/hubKey.pem
+certfile {{.homeFolder}}/certs/hubCert.pem
 # Password Authentication for users
 #password_file {{.homeFolder}}/config/mosquitto-passwd
 
@@ -56,17 +56,17 @@ certfile {{.homeFolder}}/certs/hub.crt
 listener {{.pluginPortMqtt}}
 require_certificate true
 tls_version tlsv1.2
-cafile {{.homeFolder}}/certs/ca.crt
-keyfile {{.homeFolder}}/certs/hub.key
-certfile {{.homeFolder}}/certs/hub.crt
+cafile {{.homeFolder}}/certs/caCert.pem
+keyfile {{.homeFolder}}/certs/hubKey.pem
+certfile {{.homeFolder}}/certs/hubCert.pem
 
 # Thing and Consumer authentication MQTT over TLS/SSL with login and password
 listener {{.pluginPortWS}}
 protocol websockets
 require_certificate true
-cafile {{.homeFolder}}/certs/ca.crt
-keyfile {{.homeFolder}}/certs/hub.key
-certfile {{.homeFolder}}/certs/hub.crt
+cafile {{.homeFolder}}/certs/caCert.pem
+keyfile {{.homeFolder}}/certs/hubKey.pem
+certfile {{.homeFolder}}/certs/hubCert.pem
 # password_file ./config/mosquitto-passwd.txt
 tls_version tlsv1.2
 `

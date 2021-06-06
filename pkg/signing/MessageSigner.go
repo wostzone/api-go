@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"reflect"
 
@@ -28,12 +29,12 @@ type MessageSignatureEnvelope struct {
 	Payload   []byte `json:"payload"`   // base64 encoded payload
 }
 
-// MessageSigner for signing and verifying of signed and encrypted messages
+// MessageSigner for signing and verifying of signed and encrypted messages using ECDSA
 type MessageSigner struct {
-	// GetPublicKey when available is used in mess to verify signature
+	// GetPublicKey when available is used in message to verify signature
 	GetPublicKey func(address string) *ecdsa.PublicKey // must be a variable
 	// messenger    IMessenger
-	privateKey *ecdsa.PrivateKey // private key for signing and decryption
+	privateKey *ecdsa.PrivateKey // private key for signing and decryption.
 }
 
 // DecodeMessage decrypts the message and verifies the sender signature.
@@ -41,6 +42,7 @@ type MessageSigner struct {
 // Sender field is missing then the 'address' field is used as sender.
 // object must hold the expected message type to decode the json message containging the sender info
 func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}) (isEncrypted bool, isSigned bool, err error) {
+
 	dmessage, isEncrypted, err := DecryptMessage(rawMessage, signer.privateKey)
 	isSigned, err = VerifySenderJWSSignature(dmessage, object, signer.GetPublicKey)
 	return isEncrypted, isSigned, err
@@ -248,55 +250,77 @@ type ECDSASignature struct {
 	R, S *big.Int
 }
 
-// CreateAsymKeys creates a asymmetric key set
+// CreateECDSAKeys creates a asymmetric key set
 // Returns a private key that contains its associated public key
-func CreateAsymKeys() *ecdsa.PrivateKey {
+func CreateECDSAKeys() *ecdsa.PrivateKey {
 	rng := rand.Reader
 	curve := elliptic.P256()
 	privKey, _ := ecdsa.GenerateKey(curve, rng)
 	return privKey
 }
 
-// PrivateKeyFromPem converts PEM encoded private keys into a ECDSA object for use in the application
+// Load ECDSA public/private key pair
+//  path is the path to the PEM file
+func LoadPrivateKeyPem(path string) (privateKey interface{}, err error) {
+	pem, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	privKey, err := PrivateKeyFromPem(string(pem))
+	return privKey, err
+}
+
+// PrivateKeyFromPem converts PEM encoded private keys into a key object for use in the application
 // See also PrivateKeyToPem for the opposite.
+// ECDSA and RSA keys are supported.
 // Returns nil if the encoded pem source isn't a pem format
-func PrivateKeyFromPem(pemEncodedPriv string) *ecdsa.PrivateKey {
+func PrivateKeyFromPem(pemEncodedPriv string) (privateKey interface{}, err error) {
 	if pemEncodedPriv == "" {
-		return nil
+		return nil, errors.New("PrivateKeyFromPem: no PEM encoded key provided")
 	}
 	block, _ := pem.Decode([]byte(pemEncodedPriv))
 	x509Encoded := block.Bytes
-	privateKey, _ := x509.ParseECPrivateKey(x509Encoded)
+	privateKey, err = x509.ParsePKCS8PrivateKey(x509Encoded)
 
-	return privateKey
+	return privateKey, err
 }
 
 // PrivateKeyToPem converts a private key into their PEM encoded ascii format
-// see also https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
-func PrivateKeyToPem(privateKey *ecdsa.PrivateKey) string {
-	x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
+//  privKey contains the private key to save. ECDSA and RSA keys are supported.
+func PrivateKeyToPem(privateKey interface{}) []byte {
+	x509Encoded, _ := x509.MarshalPKCS8PrivateKey(privateKey)
+	// x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
 	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
 
-	return string(pemEncoded)
+	return pemEncoded
 }
 
-// PublicKeyFromPem converts a ascii encoded public key into a ECDSA public key
-func PublicKeyFromPem(pemEncodedPub string) *ecdsa.PublicKey {
-	if pemEncodedPub == "" {
+// PublicKeyFromPem converts a PEM encoded public key into a ECDSA or RSA public key object
+func PublicKeyFromPem(pemEncodedPub []byte) (publicKey interface{}) {
+	if pemEncodedPub == nil {
 		return nil
 	}
-	blockPub, _ := pem.Decode([]byte(pemEncodedPub))
+	blockPub, _ := pem.Decode(pemEncodedPub)
 	x509EncodedPub := blockPub.Bytes
 	genericPublicKey, _ := x509.ParsePKIXPublicKey(x509EncodedPub)
-	publicKey := genericPublicKey.(*ecdsa.PublicKey)
 
-	return publicKey
+	return genericPublicKey
 }
 
-// PublicKeyToPem converts a public key into PEM encoded ascii format
+// PublicKeyToPem converts a public key into PEM encoded format.
+// ECDSA and RSA keys are supported.
 // See also PublicKeyFromPem for its counterpart
-func PublicKeyToPem(publicKey *ecdsa.PublicKey) string {
+func PublicKeyToPem(publicKey interface{}) []byte {
 	x509EncodedPub, _ := x509.MarshalPKIXPublicKey(publicKey)
 	pemEncodedPub := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
-	return string(pemEncodedPub)
+	return pemEncodedPub
+}
+
+// Save public/private key pair to PEM file with 0600 permissions
+//  privKey contains the private key to save. ECDSA and RSA keys are supported.
+//  path is the path to the PEM file
+func SavePrivateKeyPem(privKey interface{}, path string) error {
+	pem := PrivateKeyToPem(privKey)
+	err := ioutil.WriteFile(path, []byte(pem), 0600)
+	return err
 }
