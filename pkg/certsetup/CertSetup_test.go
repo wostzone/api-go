@@ -6,15 +6,29 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"os"
+	"os/exec"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wostzone/hubapi-go/api"
 	"github.com/wostzone/hubapi-go/pkg/certsetup"
 	"github.com/wostzone/hubapi-go/pkg/signing"
 )
 
+var homeFolder string
+var certFolder string
+
+// TestMain clears the certs folder for clean testing
+func TestMain(m *testing.M) {
+	cwd, _ := os.Getwd()
+	homeFolder = path.Join(cwd, "../../test")
+	certFolder = path.Join(homeFolder, "certs")
+
+	m.Run()
+	os.Exit(0)
+}
 func TestTLSCertificateGeneration(t *testing.T) {
 	hostname := "127.0.0.1"
 
@@ -28,7 +42,7 @@ func TestTLSCertificateGeneration(t *testing.T) {
 	clientKey := signing.CreateECDSAKeys()
 	clientKeyPEM := signing.PrivateKeyToPem(clientKey)
 	clientPubPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
-	clientCertPEM, err := certsetup.CreateClientCert(hostname, clientPubPEM, caCertPEM, caKeyPEM)
+	clientCertPEM, err := certsetup.CreateClientCert(hostname, api.RoleNone, clientPubPEM, caCertPEM, caKeyPEM)
 	require.NoErrorf(t, err, "Creating certificates failed:")
 	require.NotNilf(t, clientCertPEM, "Failed creating client certificate")
 	require.NotNilf(t, clientKeyPEM, "Failed creating client key")
@@ -79,7 +93,7 @@ func TestBadCert(t *testing.T) {
 	clientKey := signing.CreateECDSAKeys()
 	clientKeyPEM := signing.PrivateKeyToPem(clientKey)
 	clientPubPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
-	clientCertPEM, err := certsetup.CreateClientCert(hostname, clientPubPEM, caCertPEM, caKeyPEM)
+	clientCertPEM, err := certsetup.CreateClientCert(hostname, api.RoleNone, clientPubPEM, caCertPEM, caKeyPEM)
 
 	assert.NotNilf(t, clientKeyPEM, "Missing client key")
 	assert.Errorf(t, err, "Creating certificates should fail")
@@ -88,7 +102,8 @@ func TestBadCert(t *testing.T) {
 
 func TestCreateCerts(t *testing.T) {
 	hostname := "localhost"
-	cwd, _ := os.Getwd()
-	certFolder := path.Join(cwd, "../../test/certs")
-	certsetup.CreateCertificateBundle(hostname, certFolder)
+	out, err := exec.Command("sh", "-c", "rm -f "+path.Join(certFolder, "*.pem")).Output()
+	assert.NoError(t, err, out)
+	err = certsetup.CreateCertificateBundle(hostname, certFolder)
+	assert.NoError(t, err, out)
 }

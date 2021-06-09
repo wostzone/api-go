@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/wostzone/hubapi-go/pkg/certsetup"
@@ -25,6 +25,7 @@ type TLSClient struct {
 	address    string
 	certFolder string
 	httpClient *http.Client
+	timeout    time.Duration
 }
 
 // GetOutboundInterface Get preferred outbound network interface of this machine
@@ -35,7 +36,8 @@ func GetOutboundInterface(address string) (interfaceName string, macAddress stri
 	// This dial command doesn't actually create a connection
 	conn, err := net.Dial("udp", address)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Errorf("GetOutboundInterface: %s", err)
+		return "", "", nil
 	}
 	defer conn.Close()
 
@@ -52,7 +54,7 @@ func GetOutboundInterface(address string) (interfaceName string, macAddress stri
 
 				// only interested in the name with current IP address
 				if strings.Contains(addr.String(), ipAddr.String()) {
-					logrus.Debug("Use name : ", interf.Name)
+					logrus.Debug("GetOutboundInterface: Use name : ", interf.Name)
 					interfaceName = interf.Name
 					macAddress = fmt.Sprint(interf.HardwareAddr)
 					break
@@ -86,9 +88,11 @@ func (cl *TLSClient) Post(path string, msg interface{}) ([]byte, error) {
 //  msg body to include
 func (cl *TLSClient) Invoke(method string, path string, msg interface{}) ([]byte, error) {
 	var body io.Reader
-	var data []byte
 	var err error
 	var req *http.Request
+
+	logrus.Infof("TLSClient.Invoke: %s: %s", method, path)
+
 	// careful, a double // in the path causes a 301 and changes post to get
 	url := fmt.Sprintf("https://%s%s", cl.address, path)
 	if msg != nil {
@@ -99,29 +103,31 @@ func (cl *TLSClient) Invoke(method string, path string, msg interface{}) ([]byte
 	if err != nil {
 		return nil, err
 	}
+	// cl.httpClient.
 	resp, err := cl.httpClient.Do(req)
 	if err != nil {
-		logrus.Errorf("invoke: %s %s: %s", method, path, err)
+		logrus.Errorf("TLSClient.Invoke: %s %s: %s", method, path, err)
 		return nil, err
 	}
+	respBody, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
-		if resp.Status != "" {
-			err = errors.New(resp.Status)
-		} else {
-			err = errors.New(fmt.Sprintf("%d: %s", resp.StatusCode, resp.Status))
+		msg := fmt.Sprintf("%s: %s", resp.Status, respBody)
+		if resp.Status == "" {
+			msg = fmt.Sprintf("%d (%s): %s", resp.StatusCode, resp.Status, respBody)
 		}
-	} else if err == nil {
-		data, err = ioutil.ReadAll(resp.Body)
+		err = errors.New(msg)
 	}
 	if err != nil {
-		logrus.Errorf("invoke: read error %s %s: %s", method, path, err)
+		logrus.Errorf("TLSClient:Invoke: Error %s %s: %s", method, path, err)
 		return nil, err
 	}
-	return data, err
+	return respBody, err
 }
 
 // Start the client.
-// Mutual TLS authentication is used when both CA and client certificates are available
+// 1. If a CA certificate is not available then insecure-skip-verify is used to allow
+// connection to an unverified server (leap of faith)
+// 2. Mutual TLS authentication is used when both CA and client certificates are available
 func (cl *TLSClient) Start() (err error) {
 	var clientCertList []tls.Certificate = []tls.Certificate{}
 	var checkServerCert = false
@@ -135,7 +141,7 @@ func (cl *TLSClient) Start() (err error) {
 		caCertPool.AppendCertsFromPEM(caCertPEM)
 		checkServerCert = true
 	} else {
-		logrus.Infof("TLSClient.Start, No CA certificate in '%s' for use by client", caCertPath)
+		logrus.Infof("TLSClient.Start, No CA certificate at '%s'. InsecureSkipVerify used", caCertPath)
 	}
 
 	// Use client certificate for mutual authentication with the server
@@ -167,6 +173,7 @@ func (cl *TLSClient) Start() (err error) {
 
 	cl.httpClient = &http.Client{
 		Transport: tlsTransport,
+		Timeout:   cl.timeout,
 	}
 	return nil
 }
@@ -178,22 +185,24 @@ func (cl *TLSClient) Stop() {
 	logrus.Infof("TLSClient.Stop: Stopping TLS client")
 
 	if cl.httpClient != nil {
+		cl.httpClient.CloseIdleConnections()
 		cl.httpClient = nil
 	}
 }
 
-// Create a new TLS Client instance. Use Start/Stop to run and close connections
+// Create a new TLS Client instance.
+// If the certFolder contains a CA certificate, then server authentication is used.
+// If the certFolder also contains a client certificate and key then the client is
+// configured for mutual authentication.
+// Use Start/Stop to run and close connections
 //  address address of the server
-//  certFolder folder with ca, client certs and key (see cersetup for standard names)
+//  certFolder folder with ca, client certs and key. (see cersetup for standard names)
 // returns TLS client for submitting requests
 func NewTLSClient(address string, certFolder string) *TLSClient {
-	// get the certificates ready
-	if certFolder == "" {
-		certFolder = "./certs"
-	}
 	cl := &TLSClient{
 		address:    address,
 		certFolder: certFolder,
+		timeout:    time.Second,
 	}
 	return cl
 }

@@ -43,6 +43,7 @@ func (srv *TLSServer) AddHandler(path string, handler func(http.ResponseWriter, 
 }
 
 // Start the TLS server using CA and server certificates from the certfolder
+// A client certificate is requested but not required.
 func (srv *TLSServer) Start() error {
 	logrus.Infof("TLSServer.Start: Starting TLS server on address: %s", srv.listenAddress)
 	srv.router = mux.NewRouter()
@@ -50,7 +51,7 @@ func (srv *TLSServer) Start() error {
 	caCertPath := path.Join(srv.certFolder, certsetup.CaCertFile)
 	_, err := os.Stat(caCertPath)
 	if os.IsNotExist(err) {
-		logrus.Errorf("TLSServer.Start: Missing certificate %s", caCertPath)
+		logrus.Errorf("TLSServer.Start: Missing CA certificate %s", caCertPath)
 		return err
 	}
 	serverCertPath := path.Join(srv.certFolder, certsetup.ServerCertFile)
@@ -71,13 +72,12 @@ func (srv *TLSServer) Start() error {
 
 	serverTLSConf := &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
-		// ClientAuth:   tls.NoClientCert,
 		// ClientAuth: tls.RequireAnyClientCert, // Require CA signed cert
-		// ClientAuth: tls.RequestClientCert,
-		// ClientAuth: tls.VerifyClientCertIfGiven,
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		ClientCAs:  caCertPool,
-		// InsecureSkipVerify: false,
+		// ClientAuth: tls.RequestClientCert, //optional
+		ClientAuth: tls.VerifyClientCertIfGiven,
+		// ClientAuth: tls.RequireAndVerifyClientCert,
+		ClientCAs:          caCertPool,
+		InsecureSkipVerify: false,
 	}
 
 	srv.httpServer = &http.Server{

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/wostzone/hubapi-go/api"
 	"github.com/wostzone/hubapi-go/pkg/signing"
 )
 
@@ -35,57 +36,77 @@ const (
 	ServerCertFile = "hubCert.pem"
 	ServerKeyFile  = "hubKey.pem"
 	ClientCertFile = "clientCert.pem"
-	ClientKeyFile  = "clientKey.pen"
+	ClientKeyFile  = "clientKey.pem"
 )
 
 // CreateCertificateBundle is a convenience function to create the Hub CA, server and (plugin) client
 // certificates into the given folder. Intended for testing.
+// This only creates the missing certificates
 func CreateCertificateBundle(hostname string, certFolder string) error {
-	caCertPEM, caKeyPEM := CreateHubCA()
-
-	serverKey := signing.CreateECDSAKeys()
-	serverKeyPEM := signing.PrivateKeyToPem(serverKey)
-	serverPubPEM := signing.PublicKeyToPem(&serverKey.PublicKey)
-	serverCertPEM, err := CreateHubCert(hostname, serverPubPEM, caCertPEM, caKeyPEM)
-	if err != nil {
-		logrus.Fatalf("CreateCertificateBundle failed: %s", err)
-	}
-
-	clientKey := signing.CreateECDSAKeys()
-	clientKeyPEM := signing.PrivateKeyToPem(clientKey)
-	clientPubKeyPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
-	clientCertPEM, err := CreateClientCert(hostname, clientPubKeyPEM, caCertPEM, caKeyPEM)
-	if err != nil {
-		logrus.Fatalf("CreateCertificateBundle failed: %s", err)
-	}
-
+	var err error
+	// create the CA if needed
 	caCertPath := path.Join(certFolder, CaCertFile)
 	caKeyPath := path.Join(certFolder, CaKeyFile)
+
+	caCertPEM, _ := ioutil.ReadFile(caCertPath)
+	caKeyPEM, _ := ioutil.ReadFile(caKeyPath)
+	if caCertPEM == nil || caKeyPEM == nil {
+		caCertPEM, caKeyPEM = CreateHubCA()
+		err := ioutil.WriteFile(caKeyPath, caKeyPEM, 0600)
+		if err != nil {
+			logrus.Fatalf("CreateCertificates CA failed writing. Unable to continue: %s", err)
+		}
+		ioutil.WriteFile(caCertPath, caCertPEM, 0644)
+	}
+
+	// create the Server cert if needed
 	serverCertPath := path.Join(certFolder, ServerCertFile)
 	serverKeyPath := path.Join(certFolder, ServerKeyFile)
+	serverCertPEM, _ := ioutil.ReadFile(serverCertPath)
+	serverKeyPEM, _ := ioutil.ReadFile(serverKeyPath)
+	if serverCertPEM == nil || serverKeyPEM == nil {
+		serverKey := signing.CreateECDSAKeys()
+		serverKeyPEM = signing.PrivateKeyToPem(serverKey)
+		serverPubPEM := signing.PublicKeyToPem(&serverKey.PublicKey)
+		serverCertPEM, err = CreateHubCert(hostname, serverPubPEM, caCertPEM, caKeyPEM)
+		if err != nil {
+			logrus.Fatalf("CreateCertificateBundle server failed: %s", err)
+		}
+		ioutil.WriteFile(serverKeyPath, serverKeyPEM, 0600)
+		ioutil.WriteFile(serverCertPath, serverCertPEM, 0644)
+	}
+	// create the Client cert if needed
 	clientCertPath := path.Join(certFolder, ClientCertFile)
 	clientKeyPath := path.Join(certFolder, ClientKeyFile)
+	clientCertPEM, _ := ioutil.ReadFile(clientCertPath)
+	clientKeyPEM, _ := ioutil.ReadFile(clientKeyPath)
+	if clientCertPEM == nil || clientKeyPEM == nil {
 
-	err = ioutil.WriteFile(caKeyPath, caKeyPEM, 0600)
-	if err != nil {
-		logrus.Fatalf("CreateCertificates failed writing. Unable to continue: %s", err)
+		clientKey := signing.CreateECDSAKeys()
+		clientKeyPEM = signing.PrivateKeyToPem(clientKey)
+		clientPubKeyPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
+		clientCertPEM, err = CreateClientCert(hostname, api.RolePlugin, clientPubKeyPEM, caCertPEM, caKeyPEM)
+		if err != nil {
+			logrus.Fatalf("CreateCertificateBundle client failed: %s", err)
+		}
+		ioutil.WriteFile(clientKeyPath, clientKeyPEM, 0600)
+		ioutil.WriteFile(clientCertPath, clientCertPEM, 0644)
 	}
-	ioutil.WriteFile(caCertPath, caCertPEM, 0644)
-	ioutil.WriteFile(serverKeyPath, serverKeyPEM, 0600)
-	ioutil.WriteFile(serverCertPath, serverCertPEM, 0644)
-	ioutil.WriteFile(clientKeyPath, clientKeyPEM, 0600)
-	ioutil.WriteFile(clientCertPath, clientCertPEM, 0644)
 	return nil
 }
 
 // CreateClientCert creates a client side Hub certificate for mutual authentication from client's public key
+// The client role is intended to indicate authorization by role. It is stored in the
+// certificate OrganizationalUnit. See RoleXxx in api
+//
 // This generates a certificate using the client's public key in PEM format
 //  clientID used as the CommonName
+//  role of the client, stored as the OrganizationalUnit
 //  clientPubKeyPEM with the client's public key
 //  caCertPEM CA's certificate in PEM format.
 //  caKeyPEM CA's ECDSA key used in signing.
 // Returns the signed certificate or error
-func CreateClientCert(clientID string, clientPubKeyPEM, caCertPEM []byte, caKeyPEM []byte) (certPEM []byte, err error) {
+func CreateClientCert(clientID string, role string, clientPubKeyPEM, caCertPEM []byte, caKeyPEM []byte) (certPEM []byte, err error) {
 	var certDuration = DefaultCertDuration
 
 	caPrivKey, err := signing.PrivateKeyFromPem(string(caKeyPEM))
@@ -103,16 +124,19 @@ func CreateClientCert(clientID string, clientPubKeyPEM, caCertPEM []byte, caKeyP
 		SerialNumber: big.NewInt(2021),
 		Subject: pkix.Name{
 			Organization: []string{"WoST"},
-			Country:      []string{"CA"},
-			Province:     []string{"BC"},
-			Locality:     []string{"WoST Zone"},
-			CommonName:   clientID,
+			// Country:            []string{"CA"},
+			// Province:           []string{"BC"},
+			Locality:           []string{"WoST Zone"},
+			CommonName:         clientID,
+			OrganizationalUnit: []string{role},
+			Names:              make([]pkix.AttributeTypeAndValue, 0),
 		},
 		NotBefore: time.Now(),
 		NotAfter:  time.Now().Add(time.Duration(certDuration)),
 
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+
 		IsCA:                  false,
 		BasicConstraintsValid: true,
 	}
