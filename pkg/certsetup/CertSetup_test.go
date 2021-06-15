@@ -27,8 +27,8 @@ func TestMain(m *testing.M) {
 	homeFolder = path.Join(cwd, "../../test")
 	certFolder = path.Join(homeFolder, "certs")
 
-	m.Run()
-	os.Exit(0)
+	res := m.Run()
+	os.Exit(res)
 }
 func TestTLSCertificateGeneration(t *testing.T) {
 	hostname := "127.0.0.1"
