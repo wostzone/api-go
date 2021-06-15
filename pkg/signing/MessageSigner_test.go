@@ -47,7 +47,7 @@ func TestSaveLoadPrivKey(t *testing.T) {
 	err := signing.SavePrivateKeyPem(privKey, privKeyPemFile)
 	assert.NoError(t, err)
 
-	privKey2, err := signing.LoadPrivateKeyPem(privKeyPemFile)
+	privKey2, err := signing.LoadPrivateKeyFromFile(privKeyPemFile)
 	assert.NoError(t, err)
 	assert.NotNil(t, privKey2)
 }

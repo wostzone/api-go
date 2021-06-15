@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"path"
 	"strings"
 	"time"
 
@@ -91,6 +90,10 @@ func (cl *TLSClient) Invoke(method string, path string, msg interface{}) ([]byte
 	var err error
 	var req *http.Request
 
+	if cl == nil || cl.httpClient == nil {
+		logrus.Errorf("Invoke: '%s'. Client is not started", path)
+		return nil, errors.New("Invoke: client is not started")
+	}
 	logrus.Infof("TLSClient.Invoke: %s: %s", method, path)
 
 	// careful, a double // in the path causes a 301 and changes post to get
@@ -133,32 +136,29 @@ func (cl *TLSClient) Start() (err error) {
 	var checkServerCert = false
 
 	// Use CA certificate for server authentication if it exists
-	caCertPath := path.Join(cl.certFolder, certsetup.CaCertFile)
-	caCertPEM, _ := ioutil.ReadFile(caCertPath)
+	caCertPEM, err := certsetup.ReadPEM(cl.certFolder, certsetup.CaCertFile)
 	caCertPool := x509.NewCertPool()
-	if caCertPEM != nil {
-		logrus.Infof("TLSClient.Start: Using CA certificate in '%s' for server verification", caCertPath)
-		caCertPool.AppendCertsFromPEM(caCertPEM)
+	if err == nil {
+		logrus.Infof("TLSClient.Start: Using CA certificate in '%s' for server verification", certsetup.CaCertFile)
+		caCertPool.AppendCertsFromPEM([]byte(caCertPEM))
 		checkServerCert = true
 	} else {
-		logrus.Infof("TLSClient.Start, No CA certificate at '%s'. InsecureSkipVerify used", caCertPath)
+		logrus.Infof("TLSClient.Start, No CA certificate at '%s/%s'. InsecureSkipVerify used", cl.certFolder, certsetup.CaCertFile)
 	}
 
 	// Use client certificate for mutual authentication with the server
-	clientKeyPath := path.Join(cl.certFolder, certsetup.ClientKeyFile)
-	clientCertPath := path.Join(cl.certFolder, certsetup.ClientCertFile)
-	clientCertPEM, _ := ioutil.ReadFile(clientCertPath)
-	clientKeyPEM, _ := ioutil.ReadFile(clientKeyPath)
-	if clientCertPEM != nil && clientKeyPEM != nil {
-		logrus.Infof("TLSClient.Start: Using client certificate from %s for mutual auth", clientKeyPath)
-		clientCert, err := tls.X509KeyPair(clientCertPEM, clientKeyPEM)
+	clientCertPEM, _ := certsetup.ReadPEM(cl.certFolder, certsetup.ClientCertFile)
+	clientKeyPEM, _ := certsetup.ReadPEM(cl.certFolder, certsetup.ClientKeyFile)
+	if clientCertPEM != "" && clientKeyPEM != "" {
+		logrus.Infof("TLSClient.Start: Using client certificate from %s for mutual auth", certsetup.ClientCertFile)
+		clientCert, err := tls.X509KeyPair([]byte(clientCertPEM), []byte(clientKeyPEM))
 		if err != nil {
 			logrus.Error("TLSClient.Start: Invalid client certificate or key: ", err)
 			return err
 		}
 		clientCertList = append(clientCertList, clientCert)
 	} else {
-		logrus.Infof("TLSClient.Start, no client certificate in '%s'", clientKeyPath)
+		logrus.Infof("TLSClient.Start, No client key/certificate in '%s/%s'. Mutual auth disabled.", cl.certFolder, certsetup.ClientKeyFile)
 	}
 	tlsConfig := &tls.Config{
 		RootCAs:            caCertPool,

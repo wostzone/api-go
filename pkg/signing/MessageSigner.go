@@ -261,7 +261,7 @@ func CreateECDSAKeys() *ecdsa.PrivateKey {
 
 // Load ECDSA public/private key pair
 //  path is the path to the PEM file
-func LoadPrivateKeyPem(path string) (privateKey interface{}, err error) {
+func LoadPrivateKeyFromFile(path string) (privateKey interface{}, err error) {
 	pem, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -287,20 +287,20 @@ func PrivateKeyFromPem(pemEncodedPriv string) (privateKey interface{}, err error
 
 // PrivateKeyToPem converts a private key into their PEM encoded ascii format
 //  privKey contains the private key to save. ECDSA and RSA keys are supported.
-func PrivateKeyToPem(privateKey interface{}) []byte {
+func PrivateKeyToPem(privateKey interface{}) string {
 	x509Encoded, _ := x509.MarshalPKCS8PrivateKey(privateKey)
 	// x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
 	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
 
-	return pemEncoded
+	return string(pemEncoded)
 }
 
 // PublicKeyFromPem converts a PEM encoded public key into a ECDSA or RSA public key object
-func PublicKeyFromPem(pemEncodedPub []byte) (publicKey interface{}) {
-	if pemEncodedPub == nil {
+func PublicKeyFromPem(pemEncodedPub string) (publicKey interface{}) {
+	if pemEncodedPub == "" {
 		return nil
 	}
-	blockPub, _ := pem.Decode(pemEncodedPub)
+	blockPub, _ := pem.Decode([]byte(pemEncodedPub))
 	x509EncodedPub := blockPub.Bytes
 	genericPublicKey, _ := x509.ParsePKIXPublicKey(x509EncodedPub)
 
@@ -310,10 +310,10 @@ func PublicKeyFromPem(pemEncodedPub []byte) (publicKey interface{}) {
 // PublicKeyToPem converts a public key into PEM encoded format.
 // ECDSA and RSA keys are supported.
 // See also PublicKeyFromPem for its counterpart
-func PublicKeyToPem(publicKey interface{}) []byte {
-	x509EncodedPub, _ := x509.MarshalPKIXPublicKey(publicKey)
+func PublicKeyToPem(publicKey interface{}) (string, error) {
+	x509EncodedPub, err := x509.MarshalPKIXPublicKey(publicKey)
 	pemEncodedPub := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
-	return pemEncodedPub
+	return string(pemEncodedPub), err
 }
 
 // Save public/private key pair to PEM file with 0600 permissions

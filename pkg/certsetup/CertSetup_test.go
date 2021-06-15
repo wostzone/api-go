@@ -2,6 +2,7 @@ package certsetup_test
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -34,35 +35,36 @@ func TestTLSCertificateGeneration(t *testing.T) {
 
 	// test creating ca and server certificates
 	caCertPEM, caKeyPEM := certsetup.CreateHubCA()
-	require.NotNilf(t, caCertPEM, "Failed creating CA certificate")
-	caCert, err := tls.X509KeyPair(caCertPEM, caKeyPEM)
+	require.NotEmptyf(t, caCertPEM, "Failed creating CA certificate")
+	caCert, err := tls.X509KeyPair([]byte(caCertPEM), []byte(caKeyPEM))
 	_ = caCert
 	require.NoErrorf(t, err, "Failed parsing CA certificate")
 
 	clientKey := signing.CreateECDSAKeys()
 	clientKeyPEM := signing.PrivateKeyToPem(clientKey)
-	clientPubPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
+	clientPubPEM, err := signing.PublicKeyToPem(&clientKey.PublicKey)
+	require.NoError(t, err)
 	clientCertPEM, err := certsetup.CreateClientCert(hostname, api.OUClient, clientPubPEM, caCertPEM, caKeyPEM)
 	require.NoErrorf(t, err, "Creating certificates failed:")
-	require.NotNilf(t, clientCertPEM, "Failed creating client certificate")
-	require.NotNilf(t, clientKeyPEM, "Failed creating client key")
+	require.NotEmptyf(t, clientCertPEM, "Failed creating client certificate")
+	require.NotEmptyf(t, clientKeyPEM, "Failed creating client key")
 
 	serverKey := signing.CreateECDSAKeys()
 	serverKeyPEM := signing.PrivateKeyToPem(serverKey)
-	serverPubPEM := signing.PublicKeyToPem(&serverKey.PublicKey)
+	serverPubPEM, err := signing.PublicKeyToPem(&serverKey.PublicKey)
 	serverCertPEM, err := certsetup.CreateHubCert(hostname, serverPubPEM, caCertPEM, caKeyPEM)
 	require.NoErrorf(t, err, "Failed creating server certificate")
 	// serverCert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
 	require.NoErrorf(t, err, "Failed creating server certificate")
-	require.NotNilf(t, serverCertPEM, "Failed creating server certificate")
-	require.NotNilf(t, serverKeyPEM, "Failed creating server private key")
+	require.NotEmptyf(t, serverCertPEM, "Failed creating server certificate")
+	require.NotEmptyf(t, serverKeyPEM, "Failed creating server private key")
 
 	// verify the certificate
 	certpool := x509.NewCertPool()
-	ok := certpool.AppendCertsFromPEM(caCertPEM)
+	ok := certpool.AppendCertsFromPEM([]byte(caCertPEM))
 	require.True(t, ok, "Failed parsing CA certificate")
 
-	serverBlock, _ := pem.Decode(serverCertPEM)
+	serverBlock, _ := pem.Decode([]byte(serverCertPEM))
 	require.NotNil(t, serverBlock, "Failed decoding server certificate PEM")
 
 	serverCert, err := x509.ParseCertificate(serverBlock.Bytes)
@@ -88,22 +90,44 @@ func TestBadCert(t *testing.T) {
 		Type:  "",
 		Bytes: []byte{1, 2, 3},
 	})
-	caCertPEM = certPEMBuffer.Bytes()
+	caCertPEM = string(certPEMBuffer.Bytes())
 
 	clientKey := signing.CreateECDSAKeys()
 	clientKeyPEM := signing.PrivateKeyToPem(clientKey)
-	clientPubPEM := signing.PublicKeyToPem(&clientKey.PublicKey)
+	clientPubPEM, _ := signing.PublicKeyToPem(&clientKey.PublicKey)
 	clientCertPEM, err := certsetup.CreateClientCert(hostname, api.OUClient, clientPubPEM, caCertPEM, caKeyPEM)
 
-	assert.NotNilf(t, clientKeyPEM, "Missing client key")
+	assert.NotEmptyf(t, clientKeyPEM, "Missing client key")
 	assert.Errorf(t, err, "Creating certificates should fail")
-	assert.Nilf(t, clientCertPEM, "Created client certificate")
+	assert.Emptyf(t, clientCertPEM, "Created client certificate")
 }
 
 func TestCreateCerts(t *testing.T) {
 	hostname := "localhost"
 	out, err := exec.Command("sh", "-c", "rm -f "+path.Join(certFolder, "*.pem")).Output()
-	assert.NoError(t, err, out)
+	require.NoError(t, err, out)
 	err = certsetup.CreateCertificateBundle(hostname, certFolder)
-	assert.NoError(t, err, out)
+	require.NoError(t, err, out)
+	// load the certs
+	clientKeyPEM, err := certsetup.ReadPEM(certFolder, certsetup.ClientKeyFile)
+	require.NoError(t, err)
+	clientPrivKey, err := signing.PrivateKeyFromPem(clientKeyPEM)
+	require.NoError(t, err)
+	pubKey := clientPrivKey.(*ecdsa.PrivateKey).PublicKey
+	clientPubKeyPEM, err := signing.PublicKeyToPem(&pubKey)
+	require.NoError(t, err)
+	caCertPEM, err := certsetup.ReadPEM(certFolder, certsetup.CaCertFile)
+	assert.NoError(t, err)
+	caKeyPEM, err := certsetup.ReadPEM(certFolder, certsetup.CaKeyFile)
+	assert.NoError(t, err)
+
+	clientCertPEM, err := certsetup.ReadPEM(certFolder, certsetup.ClientCertFile)
+	_, err = tls.X509KeyPair([]byte(clientCertPEM), []byte(clientKeyPEM))
+	assert.NoError(t, err)
+
+	// CA key/cert and pubkey must be usable for creating a cert
+	cert, err := certsetup.CreateClientCert("client1", "ou1", clientPubKeyPEM, caCertPEM, caKeyPEM)
+	assert.NoError(t, err)
+	assert.NotNil(t, cert)
+
 }
