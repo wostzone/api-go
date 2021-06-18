@@ -3,17 +3,13 @@ package signing
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"reflect"
 
@@ -21,12 +17,16 @@ import (
 )
 
 // !!! THIS CODE IS NOT YET IN USE !!!
-
 // The message envelope is used if a message is signed
 type MessageSignatureEnvelope struct {
 	Sender    string `json:"sender"`    // sender clientID
 	Signature []byte `json:"signature"` // base64 encoded signature
 	Payload   []byte `json:"payload"`   // base64 encoded payload
+}
+
+// ECDSASignature ...
+type ECDSASignature struct {
+	R, S *big.Int
 }
 
 // MessageSigner for signing and verifying of signed and encrypted messages using ECDSA
@@ -55,18 +55,6 @@ func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}
 func (signer *MessageSigner) VerifySignedMessage(rawMessage string, object interface{}) (isSigned bool, err error) {
 	isSigned, err = VerifySenderJWSSignature(rawMessage, object, signer.GetPublicKey)
 	return isSigned, err
-}
-
-// Encrypt signs and encrypts the payload
-// This returns the JWS signed and JWE encrypted message
-func (signer *MessageSigner) SignAndEncrypt(payload []byte, publicKey *ecdsa.PublicKey) (message string, err error) {
-	// first sign, then encrypt as per RFC
-	message, err = CreateJWSSignature(payload, signer.privateKey)
-	if err != nil {
-		return "", err
-	}
-	emessage, err := EncryptMessage(message, publicKey)
-	return emessage, err
 }
 
 // CreateEcdsaSignature creates a ECDSA256 signature from the payload using the provided private key
@@ -101,37 +89,6 @@ func CreateJWSSignature(payload []byte, privateKey *ecdsa.PrivateKey) (string, e
 	}
 	// serialized := signedObject.FullSerialize()
 	serialized, err := signedObject.CompactSerialize()
-	return serialized, err
-}
-
-// DecryptMessage deserializes and decrypts the message using JWE
-// This returns the decrypted message, or the input message if the message was not encrypted
-func DecryptMessage(serialized string, privateKey *ecdsa.PrivateKey) (message string, isEncrypted bool, err error) {
-	message = serialized
-	decrypter, err := jose.ParseEncrypted(serialized)
-	if err == nil {
-		dmessage, err := decrypter.Decrypt(privateKey)
-		message = string(dmessage)
-		return message, true, err
-	}
-	return message, false, err
-}
-
-// EncryptMessage encrypts and serializes the message using JWE
-func EncryptMessage(message string, publicKey *ecdsa.PublicKey) (serialized string, err error) {
-	var jwe *jose.JSONWebEncryption
-
-	recpnt := jose.Recipient{Algorithm: jose.ECDH_ES, Key: publicKey}
-
-	encrypter, err := jose.NewEncrypter(jose.A128CBC_HS256, recpnt, nil)
-
-	if encrypter != nil {
-		jwe, err = encrypter.Encrypt([]byte(message))
-	}
-	if err != nil {
-		return message, err
-	}
-	serialized, _ = jwe.CompactSerialize()
 	return serialized, err
 }
 
@@ -239,88 +196,4 @@ func VerifySenderJWSSignature(rawMessage string, object interface{}, getPublicKe
 		return true, err
 	}
 	return true, err
-}
-
-//---------------------------------------------------------------------------------
-// ECDSA Helper
-//---------------------------------------------------------------------------------
-
-// ECDSASignature ...
-type ECDSASignature struct {
-	R, S *big.Int
-}
-
-// CreateECDSAKeys creates a asymmetric key set
-// Returns a private key that contains its associated public key
-func CreateECDSAKeys() *ecdsa.PrivateKey {
-	rng := rand.Reader
-	curve := elliptic.P256()
-	privKey, _ := ecdsa.GenerateKey(curve, rng)
-	return privKey
-}
-
-// Load ECDSA public/private key pair
-//  path is the path to the PEM file
-func LoadPrivateKeyFromFile(path string) (privateKey interface{}, err error) {
-	pem, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	privKey, err := PrivateKeyFromPem(string(pem))
-	return privKey, err
-}
-
-// PrivateKeyFromPem converts PEM encoded private keys into a key object for use in the application
-// See also PrivateKeyToPem for the opposite.
-// ECDSA and RSA keys are supported.
-// Returns nil if the encoded pem source isn't a pem format
-func PrivateKeyFromPem(pemEncodedPriv string) (privateKey interface{}, err error) {
-	if pemEncodedPriv == "" {
-		return nil, errors.New("PrivateKeyFromPem: no PEM encoded key provided")
-	}
-	block, _ := pem.Decode([]byte(pemEncodedPriv))
-	x509Encoded := block.Bytes
-	privateKey, err = x509.ParsePKCS8PrivateKey(x509Encoded)
-
-	return privateKey, err
-}
-
-// PrivateKeyToPem converts a private key into their PEM encoded ascii format
-//  privKey contains the private key to save. ECDSA and RSA keys are supported.
-func PrivateKeyToPem(privateKey interface{}) string {
-	x509Encoded, _ := x509.MarshalPKCS8PrivateKey(privateKey)
-	// x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
-	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
-
-	return string(pemEncoded)
-}
-
-// PublicKeyFromPem converts a PEM encoded public key into a ECDSA or RSA public key object
-func PublicKeyFromPem(pemEncodedPub string) (publicKey interface{}) {
-	if pemEncodedPub == "" {
-		return nil
-	}
-	blockPub, _ := pem.Decode([]byte(pemEncodedPub))
-	x509EncodedPub := blockPub.Bytes
-	genericPublicKey, _ := x509.ParsePKIXPublicKey(x509EncodedPub)
-
-	return genericPublicKey
-}
-
-// PublicKeyToPem converts a public key into PEM encoded format.
-// ECDSA and RSA keys are supported.
-// See also PublicKeyFromPem for its counterpart
-func PublicKeyToPem(publicKey interface{}) (string, error) {
-	x509EncodedPub, err := x509.MarshalPKIXPublicKey(publicKey)
-	pemEncodedPub := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
-	return string(pemEncodedPub), err
-}
-
-// Save public/private key pair to PEM file with 0600 permissions
-//  privKey contains the private key to save. ECDSA and RSA keys are supported.
-//  path is the path to the PEM file
-func SavePrivateKeyPem(privKey interface{}, path string) error {
-	pem := PrivateKeyToPem(privKey)
-	err := ioutil.WriteFile(path, []byte(pem), 0600)
-	return err
 }

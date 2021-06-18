@@ -13,8 +13,6 @@ import (
 	"gopkg.in/square/go-jose.v2"
 )
 
-const privKeyPemFile = "../../test/certs/privKey.pem"
-
 type TestObjectWithSender struct {
 	Field1 string `json:"field1"`
 	Field2 int    `json:"field2"`
@@ -40,16 +38,6 @@ var testObject2 = TestObjectNoSender{
 	Field1:  "The answer",
 	Field2:  43,
 	// Sender: Pub1Address,
-}
-
-func TestSaveLoadPrivKey(t *testing.T) {
-	privKey := signing.CreateECDSAKeys()
-	err := signing.SavePrivateKeyPem(privKey, privKeyPemFile)
-	assert.NoError(t, err)
-
-	privKey2, err := signing.LoadPrivateKeyFromFile(privKeyPemFile)
-	assert.NoError(t, err)
-	assert.NotNil(t, privKey2)
 }
 
 func TestEcdsaSigning(t *testing.T) {
@@ -91,6 +79,7 @@ func TestJWSSigning(t *testing.T) {
 
 	sig2 := signing.CreateEcdsaSignature(payload1, privKey)
 	assert.NotEqual(t, sig1, sig2, "JWS Signature doesn't match with Ecdsa")
+
 }
 
 func TestSigningPerformance(t *testing.T) {

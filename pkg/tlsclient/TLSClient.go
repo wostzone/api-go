@@ -136,7 +136,7 @@ func (cl *TLSClient) Start() (err error) {
 	var checkServerCert = false
 
 	// Use CA certificate for server authentication if it exists
-	caCertPEM, err := certsetup.ReadPEM(cl.certFolder, certsetup.CaCertFile)
+	caCertPEM, err := certsetup.LoadPEM(cl.certFolder, certsetup.CaCertFile)
 	caCertPool := x509.NewCertPool()
 	if err == nil {
 		logrus.Infof("TLSClient.Start: Using CA certificate in '%s' for server verification", certsetup.CaCertFile)
@@ -147,8 +147,8 @@ func (cl *TLSClient) Start() (err error) {
 	}
 
 	// Use client certificate for mutual authentication with the server
-	clientCertPEM, _ := certsetup.ReadPEM(cl.certFolder, certsetup.ClientCertFile)
-	clientKeyPEM, _ := certsetup.ReadPEM(cl.certFolder, certsetup.ClientKeyFile)
+	clientCertPEM, _ := certsetup.LoadPEM(cl.certFolder, certsetup.ClientCertFile)
+	clientKeyPEM, _ := certsetup.LoadPEM(cl.certFolder, certsetup.ClientKeyFile)
 	if clientCertPEM != "" && clientKeyPEM != "" {
 		logrus.Infof("TLSClient.Start: Using client certificate from %s for mutual auth", certsetup.ClientCertFile)
 		clientCert, err := tls.X509KeyPair([]byte(clientCertPEM), []byte(clientKeyPEM))

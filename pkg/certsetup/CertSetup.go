@@ -4,6 +4,7 @@ package certsetup
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -25,9 +26,8 @@ import (
 const caDefaultValidityDuration = time.Hour * 24 * 364 * 10 // 10 years
 const caTemporaryValidityDuration = time.Hour * 24 * 3      // 3 days
 
-// const certDurationYears = 10
-const DefaultCertDuration = time.Hour * 24 * 365
-const TempCertDuration = time.Hour * 24 * 1
+const DefaultCertDurationDays = 365
+const TempCertDurationDays = 1
 
 // Standard client and server certificate filenames all stored in PEM format
 const (
@@ -45,51 +45,51 @@ const (
 func CreateCertificateBundle(hostname string, certFolder string) error {
 	var err error
 	// create the CA if needed
-	caCertPEM, _ := ReadPEM(certFolder, CaCertFile)
-	caKeyPEM, _ := ReadPEM(certFolder, CaKeyFile)
+	caCertPEM, _ := LoadPEM(certFolder, CaCertFile)
+	caKeyPEM, _ := LoadPEM(certFolder, CaKeyFile)
 	if caCertPEM == "" || caKeyPEM == "" {
 		caCertPEM, caKeyPEM = CreateHubCA()
-		err = WriteKeyPEM(caKeyPEM, certFolder, CaKeyFile)
+		err = SaveKeyToPEM(caKeyPEM, certFolder, CaKeyFile)
 		if err != nil {
 			logrus.Fatalf("CreateCertificates CA failed writing. Unable to continue: %s", err)
 		}
-		err = WriteCertPEM(caCertPEM, certFolder, CaCertFile)
+		err = SaveCertToPEM(caCertPEM, certFolder, CaCertFile)
 	}
 
 	// create the Server cert if needed
-	serverCertPEM, _ := ReadPEM(certFolder, ServerCertFile)
-	serverKeyPEM, _ := ReadPEM(certFolder, ServerKeyFile)
+	serverCertPEM, _ := LoadPEM(certFolder, ServerCertFile)
+	serverKeyPEM, _ := LoadPEM(certFolder, ServerKeyFile)
 	if serverCertPEM == "" || serverKeyPEM == "" {
 		serverKey := signing.CreateECDSAKeys()
-		serverKeyPEM = signing.PrivateKeyToPem(serverKey)
-		serverPubPEM, err := signing.PublicKeyToPem(&serverKey.PublicKey)
+		serverKeyPEM, _ = signing.PrivateKeyToPEM(serverKey)
+		serverPubPEM, err := signing.PublicKeyToPEM(&serverKey.PublicKey)
 		if err != nil {
-			logrus.Fatalf("CreateCertificateBundle server failed: %s", err)
+			logrus.Fatalf("CreateCertificateBundle server public key failed: %s", err)
 		}
 		serverCertPEM, err = CreateHubCert(hostname, serverPubPEM, caCertPEM, caKeyPEM)
 		if err != nil {
 			logrus.Fatalf("CreateCertificateBundle server failed: %s", err)
 		}
-		WriteKeyPEM(serverKeyPEM, certFolder, ServerKeyFile)
-		WriteCertPEM(serverCertPEM, certFolder, ServerCertFile)
+		SaveKeyToPEM(serverKeyPEM, certFolder, ServerKeyFile)
+		SaveCertToPEM(serverCertPEM, certFolder, ServerCertFile)
 	}
 	// create the Client cert if needed
-	clientCertPEM, _ := ReadPEM(certFolder, ClientCertFile)
-	clientKeyPEM, _ := ReadPEM(certFolder, ClientKeyFile)
+	clientCertPEM, _ := LoadPEM(certFolder, ClientCertFile)
+	clientKeyPEM, _ := LoadPEM(certFolder, ClientKeyFile)
 	if clientCertPEM == "" || clientKeyPEM == "" {
 
 		clientKey := signing.CreateECDSAKeys()
-		clientKeyPEM = signing.PrivateKeyToPem(clientKey)
-		clientPubKeyPEM, err := signing.PublicKeyToPem(&clientKey.PublicKey)
+		clientKeyPEM, _ = signing.PrivateKeyToPEM(clientKey)
+		clientPubKeyPEM, err := signing.PublicKeyToPEM(&clientKey.PublicKey)
 		if err != nil {
 			logrus.Fatalf("CreateCertificateBundle client failed: %s", err)
 		}
-		clientCertPEM, err = CreateClientCert(hostname, api.OUPlugin, clientPubKeyPEM, caCertPEM, caKeyPEM)
+		clientCertPEM, err = CreateClientCert(hostname, api.OUPlugin, clientPubKeyPEM, caCertPEM, caKeyPEM, DefaultCertDurationDays)
 		if err != nil {
 			logrus.Fatalf("CreateCertificateBundle client failed: %s", err)
 		}
-		WriteKeyPEM(clientKeyPEM, certFolder, ClientKeyFile)
-		WriteCertPEM(clientCertPEM, certFolder, ClientCertFile)
+		SaveKeyToPEM(clientKeyPEM, certFolder, ClientKeyFile)
+		SaveCertToPEM(clientCertPEM, certFolder, ClientCertFile)
 	}
 	return nil
 }
@@ -105,10 +105,9 @@ func CreateCertificateBundle(hostname string, certFolder string) error {
 //  caCertPEM CA's certificate in PEM format.
 //  caKeyPEM CA's ECDSA key used in signing.
 // Returns the signed certificate or error
-func CreateClientCert(clientID string, ou string, clientPubKeyPEM, caCertPEM string, caKeyPEM string) (certPEM string, err error) {
-	var certDuration = DefaultCertDuration
+func CreateClientCert(clientID string, ou string, clientPubKeyPEM, caCertPEM string, caKeyPEM string, durationDays int) (certPEM string, err error) {
 
-	caPrivKey, err := signing.PrivateKeyFromPem(caKeyPEM)
+	caPrivKey, err := signing.PrivateKeyFromPEM(caKeyPEM)
 	if err != nil {
 		return "", err
 	}
@@ -117,7 +116,10 @@ func CreateClientCert(clientID string, ou string, clientPubKeyPEM, caCertPEM str
 		return "", err
 	}
 
-	clientPubKey := signing.PublicKeyFromPem(clientPubKeyPEM)
+	clientPubKey, err := signing.PublicKeyFromPEM(clientPubKeyPEM)
+	if err != nil {
+		return "", err
+	}
 
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(2021),
@@ -128,8 +130,8 @@ func CreateClientCert(clientID string, ou string, clientPubKeyPEM, caCertPEM str
 			OrganizationalUnit: []string{ou},
 			Names:              make([]pkix.AttributeTypeAndValue, 0),
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Duration(certDuration)),
+		NotBefore: time.Now().AddDate(0, 0, -1),
+		NotAfter:  time.Now().AddDate(0, 0, durationDays),
 
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
@@ -137,7 +139,6 @@ func CreateClientCert(clientID string, ou string, clientPubKeyPEM, caCertPEM str
 		IsCA:                  false,
 		BasicConstraintsValid: true,
 	}
-
 	derCertBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, clientPubKey, caPrivKey)
 	certPEM = CertDerToPEM(derCertBytes)
 	return certPEM, err
@@ -179,7 +180,7 @@ func CreateHubCA() (certPEM string, keyPEM string) {
 
 	// Create the CA private key
 	privKey := signing.CreateECDSAKeys()
-	privKeyPEM := signing.PrivateKeyToPem(privKey)
+	privKeyPEM, _ := signing.PrivateKeyToPEM(privKey)
 
 	// create the CA
 	caCertDer, err := x509.CreateCertificate(rand.Reader, rootTemplate, rootTemplate, &privKey.PublicKey, privKey)
@@ -199,7 +200,7 @@ func CreateHubCA() (certPEM string, keyPEM string) {
 // returns the signed Hub certificate in PEM format
 func CreateHubCert(hosts string, hubPublicKeyPEM string, caCertPEM string, caKeyPEM string) (certPEM string, err error) {
 	// We need the CA key and certificate
-	caPrivKey, err := signing.PrivateKeyFromPem(caKeyPEM)
+	caPrivKey, err := signing.PrivateKeyFromPEM(caKeyPEM)
 	if err != nil {
 		return "", err
 	}
@@ -208,7 +209,10 @@ func CreateHubCert(hosts string, hubPublicKeyPEM string, caCertPEM string, caKey
 		return "", err
 	}
 
-	hubPublicKey := signing.PublicKeyFromPem(hubPublicKeyPEM)
+	hubPublicKey, err := signing.PublicKeyFromPEM(hubPublicKeyPEM)
+	if err != nil {
+		return "", err
+	}
 
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(2021),
@@ -220,7 +224,7 @@ func CreateHubCert(hosts string, hubPublicKeyPEM string, caCertPEM string, caKey
 			CommonName:   "WoST Hub",
 		},
 		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Duration(DefaultCertDuration)),
+		NotAfter:  time.Now().AddDate(0, 0, DefaultCertDurationDays),
 
 		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCRLSign,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
@@ -271,27 +275,48 @@ func CertFromPEM(certPEM string) (*x509.Certificate, error) {
 	return caCert, err
 }
 
-// Read PEM file from certificate folder
-// Return PEM file as string
-func ReadPEM(certFolder string, fileName string) (pem string, err error) {
+// LoadOrCreateCertKey is a helper to load a public/private key pair for certificate management
+// If the keys don't exist, they are created.
+//  certFolder location where key file is stored
+//  keyFile is the name of the key file, certsetup.ClientKeyFile, ServerKeyFile or CAKeyFile
+// Returns ECDSA private key
+func LoadOrCreateCertKey(certFolder string, keyFile string) (*ecdsa.PrivateKey, error) {
+
+	pkPath := path.Join(certFolder, keyFile)
+	privKey, err := signing.LoadPrivateKeyFromPEM(pkPath)
+
+	if privKey == nil {
+		privKey = signing.CreateECDSAKeys()
+		err = signing.SavePrivateKeyToPEM(privKey, pkPath)
+		if err != nil {
+			logrus.Errorf("CreateClientKeys.Start, failed saving private key: %s", err)
+			return nil, err
+		}
+	}
+	return privKey, nil
+}
+
+// LoadPEM loads PEM file from certificate folder
+// Return loaded PEM file as string
+func LoadPEM(certFolder string, fileName string) (pem string, err error) {
 	pemPath := path.Join(certFolder, fileName)
 	pemData, err := ioutil.ReadFile(pemPath)
 	return string(pemData), err
 }
 
-// Write private key in pem format to file in the certificate folder
+// SaveKeyToPEM saves the private key in PEM format to file in the certificate folder
 // permissions will be 0600
 // Return error
-func WriteKeyPEM(pem string, certFolder string, fileName string) error {
+func SaveKeyToPEM(pem string, certFolder string, fileName string) error {
 	pemPath := path.Join(certFolder, fileName)
 	err := ioutil.WriteFile(pemPath, []byte(pem), 0600)
 	return err
 }
 
-// Write certificate in pem format to file in the certificate folder
+// SaveCertToPEM saves the certificate in pem format to file in the certificate folder
 // permissions will be 0644
 // Return error
-func WriteCertPEM(pem string, certFolder string, fileName string) error {
+func SaveCertToPEM(pem string, certFolder string, fileName string) error {
 	pemPath := path.Join(certFolder, fileName)
 	err := ioutil.WriteFile(pemPath, []byte(pem), 0644)
 	return err
