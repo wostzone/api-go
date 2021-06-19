@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/wostzone/hubapi-go/api"
+	"github.com/wostzone/wostlib-go/wostapi"
 )
 
 /* Client library with the MQTT API to the Hub using (tbd):
@@ -39,14 +39,14 @@ type MqttHubClient struct {
 
 // 	// listen for the response
 // 	// TODO: MQTT 5 supports request-response
-// 	respTopic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", thingID)
+// 	respTopic := strings.ReplaceAll(wostapi.TopicProvisionResponse, "{id}", thingID)
 // 	client.mqttClient.Subscribe(respTopic, func(address string, message []byte) {
 // 		certPEM = message
 // 		timeout = false
 // 		done <- true
 // 	})
 
-// 	reqTopic := strings.ReplaceAll(api.TopicProvisionRequest, "{id}", thingID)
+// 	reqTopic := strings.ReplaceAll(wostapi.TopicProvisionRequest, "{id}", thingID)
 // 	err := client.mqttClient.Publish(reqTopic, csrPEM)
 // 	if err != nil {
 // 		return nil, true
@@ -84,7 +84,7 @@ func (client *MqttHubClient) Stop() {
 
 // PublishAction publish a Thing action request to the Hub
 func (client *MqttHubClient) PublishAction(thingID string, name string, params map[string]interface{}) error {
-	topic := strings.ReplaceAll(api.TopicAction, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicAction, "{id}", thingID)
 	actions := map[string]interface{}{name: params}
 	message, err := json.Marshal(actions)
 	err = client.mqttClient.Publish(topic, message)
@@ -93,7 +93,7 @@ func (client *MqttHubClient) PublishAction(thingID string, name string, params m
 
 // PublishConfig publish a Thing configuration request to the Hub
 func (client *MqttHubClient) PublishConfigRequest(thingID string, values map[string]interface{}) error {
-	topic := strings.ReplaceAll(api.TopicSetConfig, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicSetConfig, "{id}", thingID)
 	message, err := json.Marshal(values)
 	err = client.mqttClient.Publish(topic, message)
 	return err
@@ -102,7 +102,7 @@ func (client *MqttHubClient) PublishConfigRequest(thingID string, values map[str
 // PublishEvent publish a Thing event to the WoST hub
 // Intended to by used by a Thing
 func (client *MqttHubClient) PublishEvent(thingID string, event map[string]interface{}) error {
-	topic := strings.ReplaceAll(api.TopicThingEvent, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicThingEvent, "{id}", thingID)
 	message, _ := json.Marshal(event)
 	err := client.mqttClient.Publish(topic, message)
 	return err
@@ -111,7 +111,7 @@ func (client *MqttHubClient) PublishEvent(thingID string, event map[string]inter
 // PublishPropertyValues publish a Thing property values to the WoST hub
 // Intended to by used by a Thing to publish updates of property values
 func (client *MqttHubClient) PublishPropertyValues(thingID string, values map[string]interface{}) error {
-	topic := strings.ReplaceAll(api.TopicThingPropertyValues, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicThingPropertyValues, "{id}", thingID)
 	message, _ := json.Marshal(values)
 	err := client.mqttClient.Publish(topic, message)
 	return err
@@ -119,8 +119,8 @@ func (client *MqttHubClient) PublishPropertyValues(thingID string, values map[st
 
 // PublishTD publish a Thing description to the WoST hub
 // Intended to by used by a Thing to publish an update to its TD
-func (client *MqttHubClient) PublishTD(thingID string, td api.ThingTD) error {
-	topic := strings.ReplaceAll(api.TopicThingTD, "{id}", thingID)
+func (client *MqttHubClient) PublishTD(thingID string, td wostapi.ThingTD) error {
+	topic := strings.ReplaceAll(wostapi.TopicThingTD, "{id}", thingID)
 	message, _ := json.Marshal(td)
 	err := client.mqttClient.Publish(topic, message)
 	return err
@@ -129,7 +129,7 @@ func (client *MqttHubClient) PublishTD(thingID string, td api.ThingTD) error {
 // PublishProvisionRequest publish a request for provisioning
 // Intended to by used by Thing devices to provision with a hub
 // func (client *MqttHubClient) PublishProvisionRequest(thingID string, csrPEM []byte) error {
-// 	topic := strings.ReplaceAll(api.TopicProvisionRequest, "{id}", thingID)
+// 	topic := strings.ReplaceAll(wostapi.TopicProvisionRequest, "{id}", thingID)
 // 	message, _ := json.Marshal(csrPEM)
 // 	err := client.mqttClient.Publish(topic, message)
 // 	return err
@@ -138,7 +138,7 @@ func (client *MqttHubClient) PublishTD(thingID string, td api.ThingTD) error {
 // PublishProvisionResponse publish a response to a provisioning request
 // Intended to by used by plugins that handle provisioning
 // func (client *MqttHubClient) PublishProvisionResponse(thingID string, response []byte) error {
-// 	topic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", thingID)
+// 	topic := strings.ReplaceAll(wostapi.TopicProvisionResponse, "{id}", thingID)
 // 	message, _ := json.Marshal(response)
 // 	err := client.mqttClient.Publish(topic, message)
 // 	return err
@@ -152,7 +152,7 @@ func (client *MqttHubClient) Subscribe(
 	if thingID == "" {
 		thingID = "+"
 	}
-	subscribedTopic := fmt.Sprintf("%s/%s/#", api.TopicRoot, thingID)
+	subscribedTopic := fmt.Sprintf("%s/%s/#", wostapi.TopicRoot, thingID)
 	subscribedHandler := handler
 	client.mqttClient.Subscribe(subscribedTopic, func(topic string, payload []byte) {
 		// FIXME: determine sender and format for td message
@@ -172,7 +172,7 @@ func (client *MqttHubClient) SubscribeToActions(
 	thingID string,
 	handler func(thingID string, name string, params map[string]interface{}, senderID string)) {
 
-	topic := strings.ReplaceAll(api.TopicAction, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicAction, "{id}", thingID)
 	// local copy of arguments
 	subscribedThingID := thingID
 	subscribedHandler := handler
@@ -197,7 +197,7 @@ func (client *MqttHubClient) SubscribeToActions(
 func (client *MqttHubClient) SubscribeToConfig(
 	thingID string, handler func(thingID string, config map[string]interface{}, senderID string)) {
 
-	topic := strings.ReplaceAll(api.TopicSetConfig, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicSetConfig, "{id}", thingID)
 	// local copy of arguments
 	subscribedThingID := thingID
 	subscribedHandler := handler
@@ -215,7 +215,7 @@ func (client *MqttHubClient) SubscribeToConfig(
 // SubscribeEvents receives Thing events from the WoST hub.
 func (client *MqttHubClient) SubscribeToEvents(
 	thingID string, handler func(thingID string, event map[string]interface{}, senderID string)) {
-	topic := strings.ReplaceAll(api.TopicThingEvent, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicThingEvent, "{id}", thingID)
 
 	// local copy of arguments
 	subscribedThingID := thingID
@@ -235,7 +235,7 @@ func (client *MqttHubClient) SubscribeToEvents(
 func (client *MqttHubClient) SubscribeToPropertyValues(
 	thingID string, handler func(thingID string, values map[string]interface{}, senderID string)) {
 
-	topic := strings.ReplaceAll(api.TopicThingPropertyValues, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicThingPropertyValues, "{id}", thingID)
 
 	// local copy of arguments
 	subscribedThingID := thingID
@@ -256,7 +256,7 @@ func (client *MqttHubClient) SubscribeToPropertyValues(
 // func (client *MqttHubClient) SubscribeToProvisionRequest(
 // 	handler func(thingID string, csrPEM []byte, sender string)) {
 
-// 	topic := strings.ReplaceAll(api.TopicProvisionResponse, "{id}", "+")
+// 	topic := strings.ReplaceAll(wostapi.TopicProvisionResponse, "{id}", "+")
 
 // 	// local copy of arguments
 // 	subscribedHandler := handler
@@ -283,12 +283,12 @@ func (client *MqttHubClient) SubscribeToPropertyValues(
 // SubscribeTD subscribes to receive updates to TDs from the WoST Hub
 //  thingID is the full ID of a thing, or "" to subscribe to all thingIDs
 func (client *MqttHubClient) SubscribeToTD(
-	thingID string, handler func(thingID string, thingTD api.ThingTD, senderID string)) {
+	thingID string, handler func(thingID string, thingTD wostapi.ThingTD, senderID string)) {
 
 	if thingID == "" {
 		thingID = "+"
 	}
-	topic := strings.ReplaceAll(api.TopicThingTD, "{id}", thingID)
+	topic := strings.ReplaceAll(wostapi.TopicThingTD, "{id}", thingID)
 	// local copy of arguments
 	subscribedThingID := thingID
 	subscribedHandler := handler
@@ -313,7 +313,7 @@ func (client *MqttHubClient) SubscribeToTD(
 // func (client *MqttHubClient) SubscribeProvisioning(
 // 	handler func(thingID string, csrPEM []byte, senderID string)) {
 
-// 	topic := strings.ReplaceAll(api.TopicProvisionRequest, "{id}", "+")
+// 	topic := strings.ReplaceAll(wostapi.TopicProvisionRequest, "{id}", "+")
 // 	// local copy of arguments
 // 	subscribedHandler := handler
 // 	client.mqttClient.Subscribe(topic, func(address string, message []byte) {
@@ -337,7 +337,7 @@ func (client *MqttHubClient) Unsubscribe(thingID string) {
 	if thingID == "" {
 		thingID = "+"
 	}
-	topic := api.TopicRoot + "/" + thingID + "/#"
+	topic := wostapi.TopicRoot + "/" + thingID + "/#"
 	client.mqttClient.Unsubscribe(topic)
 }
 

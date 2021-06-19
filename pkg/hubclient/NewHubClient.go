@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/wostzone/hubapi-go/api"
-	"github.com/wostzone/hubapi-go/internal/mqttclient"
-	"github.com/wostzone/hubapi-go/pkg/certsetup"
-	"github.com/wostzone/hubapi-go/pkg/hubconfig"
+	"github.com/wostzone/wostlib-go/internal/mqttclient"
+	"github.com/wostzone/wostlib-go/pkg/hubconfig"
+	"github.com/wostzone/wostlib-go/wostapi"
 )
 
 // NewHubClient creates a new hub connection for things, consumers and plugins
@@ -16,7 +15,7 @@ import (
 //   caCertFile CA certificate for verifying the TLS connections
 //   clientID to identify as. Leave empty to use hostname-timestamp
 //   credentials with secret to verify the identity
-func NewHubClient(hostPort string, caCertFile string, clientID string, credentials string) api.IHubClient {
+func NewHubClient(hostPort string, caCertFile string, clientID string, credentials string) wostapi.IHubClient {
 	client := mqttclient.NewMqttHubClient(hostPort, caCertFile, clientID, credentials)
 	return client
 }
@@ -25,11 +24,11 @@ func NewHubClient(hostPort string, caCertFile string, clientID string, credentia
 // plugins must authenticate with a client certificate.
 //   pluginID is the plugin instance ID used to connect with
 //   hubConfig with Hub configuration include certificate location
-func NewPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) api.IHubClient {
+func NewPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) wostapi.IHubClient {
 	hostPort := fmt.Sprintf("%s:%d", hubConfig.Messenger.Address, hubConfig.Messenger.PluginPortMqtt)
-	caCertFile := path.Join(hubConfig.CertsFolder, certsetup.CaCertFile)
-	clientCertFile := path.Join(hubConfig.CertsFolder, certsetup.ClientCertFile)
-	clientKeyFile := path.Join(hubConfig.CertsFolder, certsetup.ClientKeyFile)
+	caCertFile := path.Join(hubConfig.CertsFolder, wostapi.CaCertFile)
+	clientCertFile := path.Join(hubConfig.CertsFolder, wostapi.ClientCertFile)
+	clientKeyFile := path.Join(hubConfig.CertsFolder, wostapi.ClientKeyFile)
 
 	client := mqttclient.NewMqttHubPluginClient(pluginID, hostPort, caCertFile, clientCertFile, clientKeyFile)
 	return client
@@ -42,7 +41,8 @@ func NewPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) api.IHubCl
 //   caCertFile CA certificate for verifying the TLS connections
 //   clientCertFile client certificate to identify the device
 //   clientKeyFile for certificate authentication
-func NewDeviceClient(deviceID string, hostPort string, caCertFile string, clientCertFile string, clientKeyFile string) api.IHubClient {
+func NewDeviceClient(deviceID string, hostPort string,
+	caCertFile string, clientCertFile string, clientKeyFile string) wostapi.IHubClient {
 
 	client := mqttclient.NewMqttHubPluginClient(deviceID, hostPort, caCertFile, clientCertFile, clientKeyFile)
 	return client

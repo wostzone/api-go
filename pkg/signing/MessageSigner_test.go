@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wostzone/hubapi-go/pkg/signing"
+	"github.com/wostzone/wostlib-go/pkg/signing"
 	"gopkg.in/square/go-jose.v2"
 )
 

@@ -7,9 +7,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/wostzone/hubapi-go/api"
-	"github.com/wostzone/hubapi-go/internal/mqttclient"
-	"github.com/wostzone/hubapi-go/pkg/td"
+	"github.com/wostzone/wostlib-go/internal/mqttclient"
+	"github.com/wostzone/wostlib-go/pkg/td"
+	"github.com/wostzone/wostlib-go/wostapi"
 )
 
 const zone = "test"
@@ -30,7 +30,7 @@ const mqttTestThingConnection = "localhost:33101"
 
 // 	err := thingClient.Start()
 // 	assert.NoError(t, err)
-// 	thingTD := td.CreateTD(thingID, api.DeviceTypeService)
+// 	thingTD := td.CreateTD(thingID, wostapi.DeviceTypeService)
 // 	thingClient.PublishTD(thingID, thingTD)
 // 	time.Sleep(time.Second)
 // 	thingClient.Stop()
@@ -171,8 +171,8 @@ func TestPublishTD(t *testing.T) {
 	logrus.Infof("--- TestPublishTD ---")
 	credentials := ""
 	deviceID := "thing1"
-	thingID := td.CreateThingID(zone, deviceID, api.DeviceTypeSensor)
-	td1 := td.CreateTD(thingID, api.DeviceTypeSensor)
+	thingID := td.CreateThingID(zone, deviceID, wostapi.DeviceTypeSensor)
+	td1 := td.CreateTD(thingID, wostapi.DeviceTypeSensor)
 	var rxTd map[string]interface{}
 
 	thingClient := mqttclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
@@ -181,7 +181,7 @@ func TestPublishTD(t *testing.T) {
 	consumerClient := mqttclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
 	err = consumerClient.Start()
 	assert.NoError(t, err)
-	consumerClient.SubscribeToTD(thingID, func(thingID string, thing api.ThingTD, sender string) {
+	consumerClient.SubscribeToTD(thingID, func(thingID string, thing wostapi.ThingTD, sender string) {
 		logrus.Infof("TestPublishTD: Received TD of Thing %s from client %s", thingID, sender)
 		rxTd = thing
 	})
@@ -203,8 +203,8 @@ func TestSubscribeAll(t *testing.T) {
 	logrus.Infof("--- TestSubscribeAll ---")
 	credentials := ""
 	deviceID := "thing1"
-	thingID := td.CreateThingID(zone, deviceID, api.DeviceTypeSensor)
-	td1 := td.CreateTD(thingID, api.DeviceTypeSensor)
+	thingID := td.CreateThingID(zone, deviceID, wostapi.DeviceTypeSensor)
+	td1 := td.CreateTD(thingID, wostapi.DeviceTypeSensor)
 	txTd, _ := json.Marshal(td1)
 	var rxTd []byte
 	var rxThing string
@@ -245,7 +245,7 @@ func TestSubscribeAll(t *testing.T) {
 // func TestRequestProvisioning(t *testing.T) {
 // 	pluginID := "plugin1"
 // 	deviceID := "thing1"
-// 	thingID := td.CreateThingID(zone, deviceID, api.DeviceTypeSensor)
+// 	thingID := td.CreateThingID(zone, deviceID, wostapi.DeviceTypeSensor)
 
 // 	// setup a provisioning server
 // 	pluginClient := mqttclient.NewMqttHubPluginClient(

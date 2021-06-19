@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/wostzone/hubapi-go/pkg/certsetup"
+	"github.com/wostzone/wostlib-go/pkg/certsetup"
 )
 
 const mosquittoConfigFile = "wost-mosquitto-test.conf"

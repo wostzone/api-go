@@ -1,5 +1,5 @@
-// Package api with hub client library interface definition
-package api
+// Package wostapi with hub client library interface definition
+package wostapi
 
 // Message types to receive
 const (

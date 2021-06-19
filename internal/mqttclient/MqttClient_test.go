@@ -10,18 +10,19 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/wostzone/hubapi-go/internal/mqttclient"
-	"github.com/wostzone/hubapi-go/pkg/certsetup"
-	"github.com/wostzone/hubapi-go/pkg/mosquitto"
+	"github.com/wostzone/wostlib-go/internal/mqttclient"
+	"github.com/wostzone/wostlib-go/pkg/certsetup"
+	"github.com/wostzone/wostlib-go/pkg/mosquitto"
+	"github.com/wostzone/wostlib-go/wostapi"
 )
 
 // Use test/mosquitto-test.conf
 const mqttTestPluginConnection = "localhost:33100"
 
-const mqttTestCaCertFile = "certs/" + certsetup.CaCertFile
-const mqttTestCaKeyFile = "certs/" + certsetup.CaKeyFile
-const mqttTestClientCertFile = "certs/" + certsetup.ClientCertFile
-const mqttTestClientKeyFile = "certs/" + certsetup.ClientKeyFile
+const mqttTestCaCertFile = "certs/" + wostapi.CaCertFile
+const mqttTestCaKeyFile = "certs/" + wostapi.CaKeyFile
+const mqttTestClientCertFile = "certs/" + wostapi.ClientCertFile
+const mqttTestClientKeyFile = "certs/" + wostapi.ClientKeyFile
 
 const TEST_TOPIC = "test"
 

@@ -1,6 +1,6 @@
-# WoST Web Of Things API
+# WoST Web Of Things Library & API
 
-This repository defines the API's to use to connect to the WoST Hub and exchange information between Things and consumers. It contains the type definitions and client libraries to exchange messages via the hub as well as constructing a *Thing Description* document. This API aims to adhere to the [WoT Specfications](https://www.w3.org/WoT/).
+This repository defines the API's and supporting library to connect to the WoST Hub and exchange information between Things and consumers. It contains the type definitions and client libraries to exchange messages via the hub as well as constructing a *Thing Description* document. This API aims to adhere to the [WoT Specfications](https://www.w3.org/WoT/).
 
 ## Project Status
 

@@ -1,5 +1,5 @@
-// Package api with WoT and JSON-LD defined vocabulary
-package api
+// Package wostapi with WoT and JSON-LD defined vocabulary
+package wostapi
 
 // Core vocabulary definitions
 // See https://www.w3.org/TR/2020/WD-wot-thing-description11-20201124/#sec-core-vocabulary-definition

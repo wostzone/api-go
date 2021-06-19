@@ -1,7 +1,17 @@
-// Package api with group based authorization definition
+// Package wostapi with group based authorization definition
 // Group based authorization is managed centrally by the Hub and implemented by protocol bindings
 // These definitions are intended for use by protocol bindings that implement authorization for their protocol
-package api
+package wostapi
+
+// Standard client and server key/certificate filenames. All stored in PEM format.
+const (
+	CaCertFile     = "caCert.pem" // CA that signed the server and client certificates
+	CaKeyFile      = "caKey.pem"
+	ServerCertFile = "hubCert.pem"
+	ServerKeyFile  = "hubKey.pem"
+	ClientCertFile = "clientCert.pem"
+	ClientKeyFile  = "clientKey.pem"
+)
 
 // Group roles set permissions for accessing Things that are members of the same group
 const (

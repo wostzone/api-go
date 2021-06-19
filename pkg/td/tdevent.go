@@ -1,15 +1,15 @@
 // Package td with TD event creation
 package td
 
-import "github.com/wostzone/hubapi-go/api"
+import "github.com/wostzone/wostlib-go/wostapi"
 
 // CreateTDEvent creates a new TD event description
 //  title title for presentation
 //  description optional extra description of what the event represents
 func CreateTDEvent(title string, description string) map[string]interface{} {
 	event := make(map[string]interface{}, 0)
-	event[api.WoTTitle] = title
-	event[api.WoTDescription] = description
+	event[wostapi.WoTTitle] = title
+	event[wostapi.WoTDescription] = description
 
 	return event
 }

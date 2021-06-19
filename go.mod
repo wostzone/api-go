@@ -1,10 +1,10 @@
-module github.com/wostzone/hubapi-go
+module github.com/wostzone/wostlib-go
 
 go 1.14
 
 require (
 	github.com/eclipse/paho.mqtt.golang v1.3.2
-	github.com/google/go-cmp v0.5.5 // indirect
+	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0

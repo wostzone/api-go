@@ -4,15 +4,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wostzone/hubapi-go/api"
-	"github.com/wostzone/hubapi-go/pkg/td"
+	"github.com/wostzone/wostlib-go/pkg/td"
+	"github.com/wostzone/wostlib-go/wostapi"
 )
 
 const zone = "test"
 
 func TestCreateTD(t *testing.T) {
 	deviceID := zone + "Thing1"
-	thing := td.CreateTD(deviceID, api.DeviceTypeSensor)
+	thing := td.CreateTD(deviceID, wostapi.DeviceTypeSensor)
 	assert.NotNil(t, thing)
 
 	// Set version
@@ -20,7 +20,7 @@ func TestCreateTD(t *testing.T) {
 	td.SetThingVersion(thing, versions)
 
 	// Define TD property
-	prop := td.CreateProperty("Prop1", "First property", api.PropertyTypeSensor)
+	prop := td.CreateProperty("Prop1", "First property", wostapi.PropertyTypeSensor)
 	enumValues := make([]string, 0) //{"value1", "value2"}
 	td.SetPropertyEnum(prop, enumValues)
 	td.SetPropertyUnit(prop, "C")

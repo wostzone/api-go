@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/wostzone/hubapi-go/api"
-	"github.com/wostzone/hubapi-go/pkg/signing"
+	"github.com/wostzone/wostlib-go/pkg/signing"
+	"github.com/wostzone/wostlib-go/wostapi"
 )
 
 // const keySize = 2048 // 4096
@@ -29,36 +29,26 @@ const caTemporaryValidityDuration = time.Hour * 24 * 3      // 3 days
 const DefaultCertDurationDays = 365
 const TempCertDurationDays = 1
 
-// Standard client and server certificate filenames all stored in PEM format
-const (
-	CaCertFile     = "caCert.pem" // CA that signed the server and client certificates
-	CaKeyFile      = "caKey.pem"
-	ServerCertFile = "hubCert.pem"
-	ServerKeyFile  = "hubKey.pem"
-	ClientCertFile = "clientCert.pem"
-	ClientKeyFile  = "clientKey.pem"
-)
-
 // CreateCertificateBundle is a convenience function to create the Hub CA, server and (plugin) client
 // certificates into the given folder. Intended for testing.
 // This only creates missing certificates.
 func CreateCertificateBundle(hostname string, certFolder string) error {
 	var err error
 	// create the CA if needed
-	caCertPEM, _ := LoadPEM(certFolder, CaCertFile)
-	caKeyPEM, _ := LoadPEM(certFolder, CaKeyFile)
+	caCertPEM, _ := LoadPEM(certFolder, wostapi.CaCertFile)
+	caKeyPEM, _ := LoadPEM(certFolder, wostapi.CaKeyFile)
 	if caCertPEM == "" || caKeyPEM == "" {
 		caCertPEM, caKeyPEM = CreateHubCA()
-		err = SaveKeyToPEM(caKeyPEM, certFolder, CaKeyFile)
+		err = SaveKeyToPEM(caKeyPEM, certFolder, wostapi.CaKeyFile)
 		if err != nil {
 			logrus.Fatalf("CreateCertificates CA failed writing. Unable to continue: %s", err)
 		}
-		err = SaveCertToPEM(caCertPEM, certFolder, CaCertFile)
+		err = SaveCertToPEM(caCertPEM, certFolder, wostapi.CaCertFile)
 	}
 
 	// create the Server cert if needed
-	serverCertPEM, _ := LoadPEM(certFolder, ServerCertFile)
-	serverKeyPEM, _ := LoadPEM(certFolder, ServerKeyFile)
+	serverCertPEM, _ := LoadPEM(certFolder, wostapi.ServerCertFile)
+	serverKeyPEM, _ := LoadPEM(certFolder, wostapi.ServerKeyFile)
 	if serverCertPEM == "" || serverKeyPEM == "" {
 		serverKey := signing.CreateECDSAKeys()
 		serverKeyPEM, _ = signing.PrivateKeyToPEM(serverKey)
@@ -70,12 +60,12 @@ func CreateCertificateBundle(hostname string, certFolder string) error {
 		if err != nil {
 			logrus.Fatalf("CreateCertificateBundle server failed: %s", err)
 		}
-		SaveKeyToPEM(serverKeyPEM, certFolder, ServerKeyFile)
-		SaveCertToPEM(serverCertPEM, certFolder, ServerCertFile)
+		SaveKeyToPEM(serverKeyPEM, certFolder, wostapi.ServerKeyFile)
+		SaveCertToPEM(serverCertPEM, certFolder, wostapi.ServerCertFile)
 	}
 	// create the Client cert if needed
-	clientCertPEM, _ := LoadPEM(certFolder, ClientCertFile)
-	clientKeyPEM, _ := LoadPEM(certFolder, ClientKeyFile)
+	clientCertPEM, _ := LoadPEM(certFolder, wostapi.ClientCertFile)
+	clientKeyPEM, _ := LoadPEM(certFolder, wostapi.ClientKeyFile)
 	if clientCertPEM == "" || clientKeyPEM == "" {
 
 		clientKey := signing.CreateECDSAKeys()
@@ -84,12 +74,12 @@ func CreateCertificateBundle(hostname string, certFolder string) error {
 		if err != nil {
 			logrus.Fatalf("CreateCertificateBundle client failed: %s", err)
 		}
-		clientCertPEM, err = CreateClientCert(hostname, api.OUPlugin, clientPubKeyPEM, caCertPEM, caKeyPEM, DefaultCertDurationDays)
+		clientCertPEM, err = CreateClientCert(hostname, wostapi.OUPlugin, clientPubKeyPEM, caCertPEM, caKeyPEM, DefaultCertDurationDays)
 		if err != nil {
 			logrus.Fatalf("CreateCertificateBundle client failed: %s", err)
 		}
-		SaveKeyToPEM(clientKeyPEM, certFolder, ClientKeyFile)
-		SaveCertToPEM(clientCertPEM, certFolder, ClientCertFile)
+		SaveKeyToPEM(clientKeyPEM, certFolder, wostapi.ClientKeyFile)
+		SaveCertToPEM(clientCertPEM, certFolder, wostapi.ClientCertFile)
 	}
 	return nil
 }

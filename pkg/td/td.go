@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/wostzone/hubapi-go/api"
+	"github.com/wostzone/wostlib-go/wostapi"
 )
 
 // tbd json-ld parsers:
@@ -17,7 +17,7 @@ import (
 //  name of action to add
 //  action created with 'CreateAction'
 func AddTDAction(td map[string]interface{}, name string, action interface{}) {
-	actions := td[api.WoTActions].(map[string]interface{})
+	actions := td[wostapi.WoTActions].(map[string]interface{})
 	if action == nil {
 		logrus.Errorf("Add action '%s' to TD. Action is nil", name)
 	} else {
@@ -30,7 +30,7 @@ func AddTDAction(td map[string]interface{}, name string, action interface{}) {
 //  name of action to add
 //  event created with 'CreateEvent'
 func AddTDEvent(td map[string]interface{}, name string, event interface{}) {
-	events := td[api.WoTEvents].(map[string]interface{})
+	events := td[wostapi.WoTEvents].(map[string]interface{})
 	if event == nil {
 		logrus.Errorf("Add event '%s' to TD. Event is nil.", name)
 	} else {
@@ -43,7 +43,7 @@ func AddTDEvent(td map[string]interface{}, name string, event interface{}) {
 //  name of property to add
 //  property created with 'CreateProperty'
 func AddTDProperty(td map[string]interface{}, name string, property interface{}) {
-	props := td[api.WoTProperties].(map[string]interface{})
+	props := td[wostapi.WoTProperties].(map[string]interface{})
 	if property == nil {
 		logrus.Errorf("Add property '%s' to TD. Propery is nil.", name)
 	} else {
@@ -53,7 +53,7 @@ func AddTDProperty(td map[string]interface{}, name string, property interface{})
 
 // RemoveTDProperty removes a property from the TD.
 func RemoveTDProperty(td map[string]interface{}, name string) {
-	props := td[api.WoTProperties].(map[string]interface{})
+	props := td[wostapi.WoTProperties].(map[string]interface{})
 	if props == nil {
 		logrus.Errorf("RemoveTDProperty: TD does not have any properties.")
 		return
@@ -66,7 +66,7 @@ func RemoveTDProperty(td map[string]interface{}, name string) {
 //  td is a TD created with 'CreateTD'
 //  version with map of 'name: version'
 func SetThingVersion(td map[string]interface{}, version map[string]string) {
-	td[api.WoTVersion] = version
+	td[wostapi.WoTVersion] = version
 }
 
 // SetThingTitle sets the title and description of the Thing in the TD
@@ -74,8 +74,8 @@ func SetThingVersion(td map[string]interface{}, version map[string]string) {
 //  title of the Thing
 //  description of the Thing
 func SetThingDescription(td map[string]interface{}, title string, description string) {
-	td[api.WoTTitle] = title
-	td[api.WoTDescription] = description
+	td[wostapi.WoTTitle] = title
+	td[wostapi.WoTDescription] = description
 }
 
 // SetThingErrorStatus sets the error status of a Thing
@@ -98,14 +98,14 @@ func SetThingErrorStatus(td map[string]interface{}, errorStatus string) {
 //  td to add form to
 //  forms with list of forms to add. See also CreateForm to create a single form
 func SetTDForms(td map[string]interface{}, formList []map[string]interface{}) {
-	td[api.WoTForms] = formList
+	td[wostapi.WoTForms] = formList
 }
 
 // CreateThingID creates a ThingID from the zone it belongs to, the hardware device ID and device Type
 // This creates a Thing ID: URN:zone:deviceID:deviceType
 //  zone is the name of the zone the device is part of
 //  deviceID is the ID of the device to use as part of the Thing ID
-func CreateThingID(zone string, deviceID string, deviceType api.DeviceType) string {
+func CreateThingID(zone string, deviceID string, deviceType wostapi.DeviceType) string {
 	thingID := fmt.Sprintf("urn:%s:%s:%s", zone, deviceID, deviceType)
 	return thingID
 }
@@ -119,23 +119,23 @@ func CreateThingID(zone string, deviceID string, deviceType api.DeviceType) stri
 //  zone is the name of the zone the device is part of
 //  publisher is the name of the publisher that the thing originates from.
 //  deviceID is the ID of the device to use as part of the Thing ID
-func CreatePublisherThingID(zone string, publisher string, deviceID string, deviceType api.DeviceType) string {
+func CreatePublisherThingID(zone string, publisher string, deviceID string, deviceType wostapi.DeviceType) string {
 	thingID := fmt.Sprintf("urn:%s:%s:%s:%s", zone, publisher, deviceID, deviceType)
 	return thingID
 }
 
 // CreateTD creates a new Thing Description document with properties, events and actions
-func CreateTD(thingID string, deviceType api.DeviceType) map[string]interface{} {
+func CreateTD(thingID string, deviceType wostapi.DeviceType) map[string]interface{} {
 	td := make(map[string]interface{}, 0)
-	td[api.WoTAtContext] = "http://www.w3.org/ns/td"
-	td[api.WoTID] = thingID
+	td[wostapi.WoTAtContext] = "http://www.w3.org/ns/td"
+	td[wostapi.WoTID] = thingID
 	// TODO @type is a JSON-LD keyword to label using semantic tags, eg it needs a schema
 	if deviceType != "" {
-		td[api.WoTAtType] = deviceType
+		td[wostapi.WoTAtType] = deviceType
 	}
-	td[api.WoTCreated] = time.Now().Format(api.TimeFormat)
-	td[api.WoTActions] = make(map[string]interface{})
-	td[api.WoTEvents] = make(map[string]interface{})
-	td[api.WoTProperties] = make(map[string]interface{})
+	td[wostapi.WoTCreated] = time.Now().Format(wostapi.TimeFormat)
+	td[wostapi.WoTActions] = make(map[string]interface{})
+	td[wostapi.WoTEvents] = make(map[string]interface{})
+	td[wostapi.WoTProperties] = make(map[string]interface{})
 	return td
 }

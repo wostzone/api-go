@@ -1,5 +1,5 @@
-// Package api with messaging topics for the MQTT protocol binding
-package api
+// Package wostapi with messaging topics for the MQTT protocol binding
+package wostapi
 
 // TopicRoot is the base of the topic
 const TopicRoot = "things"

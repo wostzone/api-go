@@ -1,7 +1,7 @@
 // Package td with TD form creation
 package td
 
-import "github.com/wostzone/hubapi-go/api"
+import "github.com/wostzone/wostlib-go/wostapi"
 
 // CreateTDForm creates a form object description how to connect to a Thing via the Hub
 //
@@ -10,8 +10,8 @@ import "github.com/wostzone/hubapi-go/api"
 // Returns a form object with operations
 func CreateTDForm(op string, href string, contentType string, httpMethodName string) map[string]interface{} {
 	form := make(map[string]interface{}, 0)
-	form[api.WoTOperation] = op
-	form[api.WoTHref] = href
+	form[wostapi.WoTOperation] = op
+	form[wostapi.WoTHref] = href
 	form["contentType"] = contentType
 	if httpMethodName != "" {
 		form["htv:methodName"] = httpMethodName

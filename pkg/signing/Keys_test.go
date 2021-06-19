@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wostzone/hubapi-go/pkg/signing"
+	"github.com/wostzone/wostlib-go/pkg/signing"
 )
 
 const privKeyPemFile = "../../test/certs/privKey.pem"
