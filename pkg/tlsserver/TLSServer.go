@@ -19,10 +19,11 @@ import (
 
 // Simple TLS Server
 type TLSServer struct {
-	listenAddress string
-	certFolder    string
-	httpServer    *http.Server
-	router        *mux.Router
+	address    string
+	port       uint
+	certFolder string
+	httpServer *http.Server
+	router     *mux.Router
 }
 
 // AddHandler adds a new handler for a path.
@@ -45,7 +46,7 @@ func (srv *TLSServer) AddHandler(path string, handler func(http.ResponseWriter, 
 // Start the TLS server using CA and server certificates from the certfolder
 // A client certificate is requested but not required.
 func (srv *TLSServer) Start() error {
-	logrus.Infof("TLSServer.Start: Starting TLS server on address: %s", srv.listenAddress)
+	logrus.Infof("TLSServer.Start: Starting TLS server on address: %s:%d", srv.address, srv.port)
 	srv.router = mux.NewRouter()
 
 	caCertPath := path.Join(srv.certFolder, certsetup.CaCertFile)
@@ -86,7 +87,7 @@ func (srv *TLSServer) Start() error {
 	}
 
 	srv.httpServer = &http.Server{
-		Addr: srv.listenAddress,
+		Addr: fmt.Sprintf("%s:%d", srv.address, srv.port),
 		// ReadTimeout:  5 * time.Minute, // 5 min to allow for delays when 'curl' on OSx prompts for username/password
 		// WriteTimeout: 10 * time.Second,
 		Handler:   srv.router,
@@ -120,18 +121,20 @@ func (srv *TLSServer) Stop() {
 }
 
 // Create a new TLS Server instance. Use Start/Stop to run and close connections
-//  listenAddress listening address
+//  address listening address
+//  port listening port
 //  certFolder folder with ca, server certs and key (see certsetup for certificate creation
 // and standard naming.
 //
 // returns TLS server for handling requests
-func NewTLSServer(listenAddress string, certFolder string) *TLSServer {
+func NewTLSServer(address string, port uint, certFolder string) *TLSServer {
 	srv := &TLSServer{}
 	// get the certificates ready
 	if certFolder == "" {
 		certFolder = "./certs"
 	}
 	srv.certFolder = certFolder
-	srv.listenAddress = listenAddress
+	srv.address = address
+	srv.port = port
 	return srv
 }

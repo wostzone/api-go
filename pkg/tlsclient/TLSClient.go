@@ -22,6 +22,7 @@ import (
 // Simple TLS Client
 type TLSClient struct {
 	address    string
+	port       uint
 	certFolder string
 	httpClient *http.Client
 	timeout    time.Duration
@@ -33,9 +34,9 @@ type TLSClient struct {
 func GetOutboundInterface(address string) (interfaceName string, macAddress string, ipAddr net.IP) {
 
 	// This dial command doesn't actually create a connection
-	conn, err := net.Dial("udp", address)
+	conn, err := net.Dial("udp", address+":9999")
 	if err != nil {
-		logrus.Errorf("GetOutboundInterface: %s", err)
+		logrus.Errorf("GetOutboundInterface for address '%s': %s", address, err)
 		return "", "", nil
 	}
 	defer conn.Close()
@@ -69,7 +70,7 @@ func GetOutboundInterface(address string) (interfaceName string, macAddress stri
 
 // testing
 func (cl *TLSClient) Post(path string, msg interface{}) ([]byte, error) {
-	url := fmt.Sprintf("https://%s/%s", cl.address, path)
+	url := fmt.Sprintf("https://%s:%d/%s", cl.address, cl.port, path)
 
 	bodyBytes, _ := json.Marshal(msg)
 	body := bytes.NewReader(bodyBytes)
@@ -97,7 +98,7 @@ func (cl *TLSClient) Invoke(method string, path string, msg interface{}) ([]byte
 	logrus.Infof("TLSClient.Invoke: %s: %s", method, path)
 
 	// careful, a double // in the path causes a 301 and changes post to get
-	url := fmt.Sprintf("https://%s%s", cl.address, path)
+	url := fmt.Sprintf("https://%s:%d%s", cl.address, cl.port, path)
 	if msg != nil {
 		bodyBytes, _ := json.Marshal(msg)
 		body = bytes.NewReader(bodyBytes)
@@ -195,12 +196,14 @@ func (cl *TLSClient) Stop() {
 // If the certFolder also contains a client certificate and key then the client is
 // configured for mutual authentication.
 // Use Start/Stop to run and close connections
-//  address address of the server
+//  address address of the server (ex port)
+//  port to connect to
 //  certFolder folder with ca, client certs and key. (see cersetup for standard names)
 // returns TLS client for submitting requests
-func NewTLSClient(address string, certFolder string) *TLSClient {
+func NewTLSClient(address string, port uint, certFolder string) *TLSClient {
 	cl := &TLSClient{
 		address:    address,
+		port:       port,
 		certFolder: certFolder,
 		timeout:    time.Second,
 	}
