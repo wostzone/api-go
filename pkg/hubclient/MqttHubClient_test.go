@@ -13,10 +13,9 @@ import (
 )
 
 const zone = "test"
-const mqttTestConsumerConnection = "localhost:33101"
-const mqttTestThingConnection = "localhost:33101"
+const mqttAddress = "localhost:33100"
 
-// THIS USES THE SETUP IN MqttClient_test.go
+//--- THIS USES THE SETUP IN MqttClient_test.go
 
 // Custom test to production
 // func TestPublishCustom(t *testing.T) {
@@ -44,8 +43,8 @@ func TestPublishAction(t *testing.T) {
 	var rxParams map[string]interface{}
 	actionName := "action1"
 	actionInput := map[string]interface{}{"input1": "inputValue"}
-	consumerClient := hubclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", "")
-	thingClient := hubclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", "")
+	consumerClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", "")
+	thingClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", "")
 	thingClient.SubscribeToActions(thingID, func(thingID string, name string, params map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishAction: Received action of Thing %s from client %s", thingID, sender)
 		rxName = name
@@ -81,8 +80,8 @@ func TestPublishConfig(t *testing.T) {
 	var rxID string
 
 	config1 := map[string]interface{}{"prop1": "value1"}
-	consumerClient := hubclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
-	thingClient := hubclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
+	consumerClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
+	thingClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
 	thingClient.SubscribeToConfig(thingID, func(thingID string, config map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishConfig: Received config of Thing %s from client %s", thingID, sender)
 		rx = config
@@ -114,8 +113,8 @@ func TestPublishEvent(t *testing.T) {
 	event1 := map[string]interface{}{"eventName": "eventValue"}
 	var rx map[string]interface{}
 
-	consumerClient := hubclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
-	thingClient := hubclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
+	consumerClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
+	thingClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
 
 	err := thingClient.Start()
 	assert.NoError(t, err)
@@ -146,10 +145,10 @@ func TestPublishPropertyValues(t *testing.T) {
 	propValues := map[string]interface{}{"propname": "value"}
 	var rx map[string]interface{}
 
-	thingClient := hubclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
+	thingClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
 	err := thingClient.Start()
 	assert.NoError(t, err)
-	consumerClient := hubclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
+	consumerClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
 	err = consumerClient.Start()
 	assert.NoError(t, err)
 	consumerClient.SubscribeToPropertyValues(thingID, func(thingID string, values map[string]interface{}, sender string) {
@@ -175,10 +174,10 @@ func TestPublishTD(t *testing.T) {
 	td1 := td.CreateTD(thingID, vocab.DeviceTypeSensor)
 	var rxTd map[string]interface{}
 
-	thingClient := hubclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
+	thingClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
 	err := thingClient.Start()
 	assert.NoError(t, err)
-	consumerClient := hubclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
+	consumerClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
 	err = consumerClient.Start()
 	assert.NoError(t, err)
 	consumerClient.SubscribeToTD(thingID, func(thingID string, thing map[string]interface{}, sender string) {
@@ -209,10 +208,10 @@ func TestSubscribeAll(t *testing.T) {
 	var rxTd []byte
 	var rxThing string
 
-	pluginClient := hubclient.NewMqttHubClient(mqttTestConsumerConnection, mqttTestCaCertFile, "", credentials)
+	pluginClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
 	err := pluginClient.Start()
 	assert.NoError(t, err)
-	thingClient := hubclient.NewMqttHubClient(mqttTestThingConnection, mqttTestCaCertFile, "", credentials)
+	thingClient := hubclient.NewMqttHubClient(mqttAddress, mqttTestCaCertFile, "", credentials)
 	err = thingClient.Start()
 	assert.NoError(t, err)
 	pluginClient.Subscribe("", func(thingID string, msgType string, raw []byte, sender string) {

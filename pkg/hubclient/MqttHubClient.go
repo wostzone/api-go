@@ -23,7 +23,6 @@ const (
 	MessageTypeEvent  = "event"
 	MessageTypeTD     = "td"
 	MessageTypeValues = "values" // receive property values
-	// MessageTypeProvision = "provision" // receive a provision request message
 )
 
 // MqttHubClient is a wrapper around the generic MQTT client with convenience methods for use
@@ -372,17 +371,13 @@ func NewMqttHubClient(hostPort string, caCertFile string, userName string, passw
 // NewMqttHubClient creates a new hub connection for use by Plugins
 // Plugins use a client certificate to authenticate.
 //  pluginID is the username (no pass needed) to identify as
-//  hubConfig with certificate information
-//  hostPort address and port to connect to
-//  caCertFile containing the broker CA certificate for TLS connections
-//  clientCertFile for client authentication
-//  clientKeyFile for client authentication
+//  hubConfig with mqtt listening ports and certificate location
 func NewMqttHubPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) *MqttHubClient {
 
 	caCertPath := path.Join(hubConfig.CertsFolder, certsetup.CaCertFile)
 	pluginCertPath := path.Join(hubConfig.CertsFolder, certsetup.PluginCertFile)
 	pluginKeyPath := path.Join(hubConfig.CertsFolder, certsetup.PluginKeyFile)
-	hostPort := fmt.Sprintf("%s:%d", hubConfig.Messenger.Address, hubConfig.Messenger.ClientPortMqtt)
+	hostPort := fmt.Sprintf("%s:%d", hubConfig.Messenger.Address, hubConfig.Messenger.CertPortMqtt)
 	client := &MqttHubClient{
 		timeoutSec:     3,
 		clientCertFile: pluginCertPath,
@@ -396,7 +391,7 @@ func NewMqttHubPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) *Mq
 // NewMqttHubDeviceClient creates a new hub mqtt connection for devices that publish Things.
 // devices authenticate with a client certificate assigned during provisioning.
 //   deviceID thingID of the device connecting
-//   hostPort address and port to connect to
+//   hostPort address and port to connect to. This must use the mqtt cert port
 //   caCertFile CA certificate for verifying the TLS connections
 //   clientCertFile client certificate to identify the device
 //   clientKeyFile for certificate authentication

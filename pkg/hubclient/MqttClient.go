@@ -18,9 +18,6 @@ import (
 // ConnectionTimeoutSec constant with connection and reconnection timeouts
 const ConnectionTimeoutSec = 20
 
-// TLSPort is the default secure port to connect to mqtt
-const TLSPort = 8883
-
 // MqttClient client wrapper around pahoClient
 // This addresses problems with reconnect and auto resubscribe while using clean session
 type MqttClient struct {
@@ -35,9 +32,7 @@ type MqttClient struct {
 	subscriptions       map[string]*TopicSubscription // map of TopicSubscription for re-subscribing after reconnect
 	tlsVerifyServerCert bool                          // verify the server certificate, this requires a Root CA signed cert
 	tlsCACertFile       string                        // path to CA certificate
-	// clientCertFile      string                        // optional client certificate file
-	// clientKeyFile       string                        // optional client cert key file
-	updateMutex *sync.Mutex // mutex for async updating of subscriptions
+	updateMutex         *sync.Mutex                   // mutex for async updating of subscriptions
 }
 
 // TopicSubscription holds subscriptions to restore after disconnect
@@ -110,16 +105,18 @@ func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName stri
 		// https://opium.io/blog/mqtt-in-go/
 		ServerName: "", // hostname on the server certificate. How to get this?
 	}
+	// auth with client certificate and/or username/password
 	if clientCert != nil {
 		tlsConfig.Certificates = []tls.Certificate{*clientCert}
 	}
+	if password != "" {
+		opts.Username = userName
+		opts.Password = password
+	}
 	opts.SetTLSConfig(tlsConfig)
-	opts.Username = userName
-	opts.Password = password
 
-	logrus.Infof("MqttClient.Connect: Connecting to MQTT server: %s with clientID %s"+
-		" AutoReconnect and CleanSession are set.",
-		brokerURL, mqttClient.clientID)
+	logrus.Infof("MqttClient.Connect: Connecting to MQTT server: %s with clientID=%s, username=%s, client-certificate: %v",
+		brokerURL, mqttClient.clientID, userName, (clientCert != nil))
 
 	// FIXME: PahoMqtt disconnects when sending a lot of messages, like on startup of some adapters.
 	mqttClient.pahoClient = pahomqtt.NewClient(opts)
@@ -341,9 +338,10 @@ func (mqttClient *MqttClient) Unsubscribe(topic string) {
 // NewMqttClient creates a new MQTT messenger instance
 // The clientCertFile and clientKeyFile are optional. If provided then they must be signed
 // by the CA used by the broker, so that the broker can authenticate the client. Leave empty when
-// not using client certificates.
+// not using client certificates. See ConnectWithPassword or ConnectWithClientCert for
+// the two methods of authentication.
 //  hostPort to connect to
-//  caCertFile must contain the server CA certificate filename
+//  caCertFile is a PEM file containing the server CA certificate filename
 func NewMqttClient(hostPort string, caCertFile string) *MqttClient {
 
 	// ClientID defaults to hostname-millisecondsSinceEpoc

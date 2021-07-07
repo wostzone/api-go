@@ -3,7 +3,8 @@
 # Message bus server
 messenger:
   address: "localhost"
-  port: 8883 # local mosquitto test server
+  certPortMqtt: 33100 # certificate based auth over MQTT/TLS
+  unpwPortWS: 33101 # username password auth over WebSocket/TLS
   timeout: 1
 
 # invalid because the folder doesn't exist

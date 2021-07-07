@@ -5,9 +5,10 @@
 messenger:
   #protocol: "" # internal, MQTT, default internal
   #address: "localhost" # hostname or address to listen on
-  #port: 9678
+  #certPortMqtt: 33100 # certificate based auth over MQTT/TLS
+  #unpwPortWS: 33101 # username password auth over WebSocket/TLS
   # the next line intentionally causes an error 
-  -brokenyamlfile
+  -brokenyamlfileonline12
   timeout: 1
 
 #certsFolder: "./certs" # set to activate TLS

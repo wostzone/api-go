@@ -18,8 +18,8 @@ var flagsAreSet bool = false
 // -certsFolder  /path/to/alt/certs   optional certificate folder, eg when using mqtt. Default is {home}/certs
 // -configFolder /path/to/alt/config  optional alternative config, eg /etc/wost
 // -address      localhost            optional message bus address
-// -mqttPort     8883                 optional alternative mqtt port
-// -wsPort       8884                 optional alternative websocket port
+// -certPortMqtt 9883                 mqtt port for certificate authentication
+// -unpwPortWS   9884                 websocket port for username/password authentication
 // -logFile      /path/to/hub.log     optional logfile. Use to determine logs folder
 // -logLevel warning                  for extra logging, default is hub loglevel
 //
@@ -38,8 +38,8 @@ func SetHubCommandlineArgs(config *HubConfig) {
 	flag.StringVar(&config.CertsFolder, "certsFolder", config.CertsFolder, "Optional certificates directory for TLS")
 	flag.StringVar(&config.ConfigFolder, "configFolder", config.ConfigFolder, "Plugin configuration `folder`")
 	flag.StringVar(&config.Messenger.Address, "mqttAddress", config.Messenger.Address, "Message bus hostname or address")
-	flag.IntVar(&config.Messenger.ClientPortMqtt, "mqttPort", config.Messenger.ClientPortMqtt, "MQTT client port")
-	flag.IntVar(&config.Messenger.ClientPortWS, "wsPort", config.Messenger.ClientPortWS, "Websocket client port")
+	flag.IntVar(&config.Messenger.CertPortMqtt, "certPortMqtt", config.Messenger.CertPortMqtt, "MQTT TLS client port")
+	flag.IntVar(&config.Messenger.UnpwPortWS, "unpwPortWS", config.Messenger.UnpwPortWS, "Websocket TLS client port")
 	flag.StringVar(&config.Logging.LogFile, "logFile", config.Logging.LogFile, "Log to file")
 	flag.StringVar(&config.PluginFolder, "pluginFolder", config.PluginFolder, "Alternate plugin `folder`. Empty to not load plugins.")
 	flag.StringVar(&config.Logging.Loglevel, "logLevel", config.Logging.Loglevel, "Loglevel: {error|`warning`|info|debug}")

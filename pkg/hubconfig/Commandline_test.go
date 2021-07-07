@@ -104,7 +104,7 @@ func TestSetupConfigBadConfigfile(t *testing.T) {
 
 	hubConfig, err := hubconfig.LoadCommandlineConfig(homeFolder, "", nil)
 	assert.Error(t, err)
-	assert.Equal(t, "yaml: line 11", err.Error()[0:13], "Expected yaml parse error")
+	assert.Equal(t, "yaml: line 12", err.Error()[0:13], "Expected yaml parse error")
 	assert.NotNil(t, hubConfig)
 }
 

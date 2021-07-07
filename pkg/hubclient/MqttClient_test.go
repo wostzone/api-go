@@ -2,6 +2,7 @@ package hubclient_test
 
 import (
 	"os"
+	"os/exec"
 	"path"
 	"sync"
 	"testing"
@@ -12,11 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wostzone/wostlib-go/pkg/certsetup"
 	"github.com/wostzone/wostlib-go/pkg/hubclient"
+	"github.com/wostzone/wostlib-go/pkg/hubconfig"
 	"github.com/wostzone/wostlib-go/pkg/testenv"
 )
 
-// Use test/mosquitto-test.conf
-const mqttTestPluginConnection = "localhost:33100"
+// Use test/mosquitto-test.conf and a client cert port
+const mqttCertAuthAddress = "localhost:33100"
 
 var mqttTestCaCertFile string
 var mqttTestCaKeyFile string
@@ -29,7 +31,10 @@ const TEST_TOPIC = "test"
 const mosquittoConfigFile = "mosquitto-test.conf"
 const testPluginID = "test-user"
 
-// var mosquittoCmd *exec.Cmd
+// easy cleanup for existing  certificate
+func removeCerts(folder string) {
+	_, _ = exec.Command("sh", "-c", "rm -f "+path.Join(folder, "*.pem")).Output()
+}
 
 // setup - launch mosquitto
 func TestMain(m *testing.M) {
@@ -38,6 +43,7 @@ func TestMain(m *testing.M) {
 	home := path.Join(cwd, "../../test")
 	os.Chdir(home)
 	certsFolder := path.Join(home, "certs")
+	hubconfig.SetLogging("info", "", "")
 
 	mqttTestCaCertFile = path.Join(certsFolder, certsetup.CaCertFile)
 	mqttTestCaKeyFile = path.Join(certsFolder, certsetup.CaKeyFile)
@@ -45,6 +51,8 @@ func TestMain(m *testing.M) {
 	mqttTestClientKeyFile = path.Join(certsFolder, certsetup.PluginKeyFile)
 
 	configFolder := path.Join(home, "config")
+	// clean start
+	removeCerts(certsFolder)
 	certsetup.CreateCertificateBundle(hostnames, certsFolder)
 	mosqConfigPath := path.Join(configFolder, mosquittoConfigFile)
 
@@ -62,7 +70,7 @@ func TestMain(m *testing.M) {
 func TestMqttConnect(t *testing.T) {
 	logrus.Infof("--- TestMqttConnect ---")
 
-	client := hubclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client := hubclient.NewMqttClient(mqttCertAuthAddress, mqttTestCaCertFile)
 	client.SetTimeout(10)
 	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.NoError(t, err)
@@ -94,7 +102,7 @@ func TestMQTTPubSub(t *testing.T) {
 	const timeout = 10
 	// certFolder := ""
 
-	client := hubclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client := hubclient.NewMqttClient(mqttCertAuthAddress, mqttTestCaCertFile)
 	client.SetTimeout(5)
 	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
@@ -122,7 +130,7 @@ func TestMQTTPubSub(t *testing.T) {
 func TestMQTTMultipleSubscriptions(t *testing.T) {
 	logrus.Infof("--- TestMQTTMultipleSubscriptions ---")
 
-	client := hubclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client := hubclient.NewMqttClient(mqttCertAuthAddress, mqttTestCaCertFile)
 	var rx1 string
 	var rx2 string
 	rxMutex := sync.Mutex{}
@@ -201,7 +209,7 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 func TestMQTTBadUnsubscribe(t *testing.T) {
 	logrus.Infof("--- TestMQTTBadUnsubscribe ---")
 
-	client := hubclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client := hubclient.NewMqttClient(mqttCertAuthAddress, mqttTestCaCertFile)
 	client.SetTimeout(10)
 	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	require.NoError(t, err)
@@ -226,7 +234,7 @@ func TestMQTTPubNoConnect(t *testing.T) {
 func TestMQTTSubBeforeConnect(t *testing.T) {
 	logrus.Infof("--- TestMQTTSubBeforeConnect ---")
 
-	client := hubclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client := hubclient.NewMqttClient(mqttCertAuthAddress, mqttTestCaCertFile)
 	const timeout = 10
 	const msg = "hello 1"
 	var rx string
@@ -262,7 +270,7 @@ func TestSubscribeWildcard(t *testing.T) {
 	const testTopic1 = "test/1/5"
 	const wildcardTopic = "test/+/#"
 
-	client := hubclient.NewMqttClient(mqttTestPluginConnection, mqttTestCaCertFile)
+	client := hubclient.NewMqttClient(mqttCertAuthAddress, mqttTestCaCertFile)
 	const timeout = 10
 	const msg = "hello 1"
 	var rx string
