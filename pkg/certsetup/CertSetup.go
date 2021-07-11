@@ -59,7 +59,7 @@ const (
 const pluginClientID = "plugin"
 
 // const keySize = 2048 // 4096
-const caDefaultValidityDuration = time.Hour * 24 * 364 * 10 // 10 years
+const caDefaultValidityDuration = time.Hour * 24 * 364 * 20 // 20 years
 const caTemporaryValidityDuration = time.Hour * 24 * 3      // 3 days
 
 const DefaultCertDurationDays = 365
@@ -67,12 +67,19 @@ const TempCertDurationDays = 1
 
 // CreateCertificateBundle is a convenience function to create the Hub CA, server and (plugin) client
 // certificates into the given folder.
-// The names contain the hostnames and ip addresses that are valid for the hub.
-// This only creates missing certificates.
+//  * The CA certificate will only be created if missing
+//  * The hub and plugin keys and certificate will always be recreated
+//
 //  names contain the list of hostname and ip addresses the hub can be reached at. Used in hub cert.
+//  certFolder where to create the certificates
 func CreateCertificateBundle(names []string, certFolder string) error {
 	var err error
-	// create the CA if needed
+	forcePluginCert := true // best to always created these certs
+	forceHubCert := true
+
+	// create the CA only if needed
+	// TODO: How to handle CA expiry?
+	// TODO: Handle CA revocation
 	caCertPEM, _ := LoadPEM(certFolder, CaCertFile)
 	caKeyPEM, _ := LoadPEM(certFolder, CaKeyFile)
 	if caCertPEM == "" || caKeyPEM == "" {
@@ -87,7 +94,7 @@ func CreateCertificateBundle(names []string, certFolder string) error {
 	// create the Hub server cert if needed
 	serverCertPEM, _ := LoadPEM(certFolder, HubCertFile)
 	serverKeyPEM, _ := LoadPEM(certFolder, HubKeyFile)
-	if serverCertPEM == "" || serverKeyPEM == "" {
+	if serverCertPEM == "" || serverKeyPEM == "" || forceHubCert {
 		serverKey := signing.CreateECDSAKeys()
 		serverKeyPEM, _ = signing.PrivateKeyToPEM(serverKey)
 		serverPubPEM, err := signing.PublicKeyToPEM(&serverKey.PublicKey)
@@ -104,7 +111,7 @@ func CreateCertificateBundle(names []string, certFolder string) error {
 	// create the Plugin certificate
 	pluginCertPEM, _ := LoadPEM(certFolder, PluginCertFile)
 	pluginKeyPEM, _ := LoadPEM(certFolder, PluginKeyFile)
-	if pluginCertPEM == "" || pluginKeyPEM == "" {
+	if pluginCertPEM == "" || pluginKeyPEM == "" || forcePluginCert {
 
 		pluginKey := signing.CreateECDSAKeys()
 		pluginKeyPEM, _ = signing.PrivateKeyToPEM(pluginKey)

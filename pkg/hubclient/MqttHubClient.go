@@ -104,24 +104,6 @@ func (client *MqttHubClient) PublishTD(thingID string, td map[string]interface{}
 	return err
 }
 
-// PublishProvisionRequest publish a request for provisioning
-// Intended to by used by Thing devices to provision with a hub
-// func (client *MqttHubClient) PublishProvisionRequest(thingID string, csrPEM []byte) error {
-// 	topic := strings.ReplaceAll(TopicProvisionRequest, "{id}", thingID)
-// 	message, _ := json.Marshal(csrPEM)
-// 	err := client.mqttClient.Publish(topic, message)
-// 	return err
-// }
-
-// PublishProvisionResponse publish a response to a provisioning request
-// Intended to by used by plugins that handle provisioning
-// func (client *MqttHubClient) PublishProvisionResponse(thingID string, response []byte) error {
-// 	topic := strings.ReplaceAll(TopicProvisionResponse, "{id}", thingID)
-// 	message, _ := json.Marshal(response)
-// 	err := client.mqttClient.Publish(topic, message)
-// 	return err
-// }
-
 // Subscribe subscribes to messages from Things
 func (client *MqttHubClient) Subscribe(
 	thingID string,
@@ -229,35 +211,6 @@ func (client *MqttHubClient) SubscribeToPropertyValues(
 	})
 }
 
-// SubscribeToProvisionRequest receives requests for provisioning
-// Intended to by used by plugins that handle provisioning
-// func (client *MqttHubClient) SubscribeToProvisionRequest(
-// 	handler func(thingID string, csrPEM []byte, sender string)) {
-
-// 	topic := strings.ReplaceAll(TopicProvisionResponse, "{id}", "+")
-
-// 	// local copy of arguments
-// 	subscribedHandler := handler
-// 	client.mqttClient.Subscribe(topic, func(address string, message []byte) {
-// 		// FIXME: determine sender and format for property values message
-// 		sender := ""
-// 		// FIXME: don't depend on topic format
-// 		topicParts := strings.Split(topic, "/")
-// 		if len(topicParts) < 2 {
-// 			logrus.Infof("ProvisionRequest: Topic %s invalid", topic)
-// 			return
-// 		}
-// 		thingID := topicParts[1]
-// 		var csrPEM []byte
-// 		err := json.Unmarshal(message, &csrPEM)
-// 		if err != nil {
-// 			logrus.Infof("ProvisionRequest: topic %s, csrPEM unmarshal error: %s", topic, err)
-// 		} else {
-// 			subscribedHandler(thingID, csrPEM, sender)
-// 		}
-// 	})
-// }
-
 // SubscribeTD subscribes to receive updates to TDs from the WoST Hub
 //  thingID is the full ID of a thing, or "" to subscribe to all thingIDs
 func (client *MqttHubClient) SubscribeToTD(
@@ -287,29 +240,6 @@ func (client *MqttHubClient) SubscribeToTD(
 	})
 }
 
-// SubscribeProvisioning subscribes to receive provisioning requests
-// func (client *MqttHubClient) SubscribeProvisioning(
-// 	handler func(thingID string, csrPEM []byte, senderID string)) {
-
-// 	topic := strings.ReplaceAll(TopicProvisionRequest, "{id}", "+")
-// 	// local copy of arguments
-// 	subscribedHandler := handler
-// 	client.mqttClient.Subscribe(topic, func(address string, message []byte) {
-// 		// FIXME: determine sender
-// 		sender := ""
-// 		addressParts := strings.Split(address, "/")
-// 		rxThingID := addressParts[1]
-// 		request := make(map[string]interface{})
-// 		err := json.Unmarshal(message, &request)
-// 		if err != nil {
-// 			logrus.Errorf("Received message on topic '%s' but unmarshal failed: %s", topic, err)
-// 		} else {
-// 			// TODO decode the content
-// 			subscribedHandler(rxThingID, message, sender)
-// 		}
-// 	})
-// }
-
 // Unsubscribe removes thing subscription
 func (client *MqttHubClient) Unsubscribe(thingID string) {
 	if thingID == "" {
@@ -319,9 +249,8 @@ func (client *MqttHubClient) Unsubscribe(thingID string) {
 	client.mqttClient.Unsubscribe(topic)
 }
 
-// NewMqttHubClient creates a new hub connection for Things and consumers
-// Consumers use a login name and password to authenticate while Things can use
-// their thingID and shared key obtained during provisioning.
+// NewMqttHubClient creates a new hub connection for consumers
+// Consumers use a login name and password to authenticate
 //   hostPort address and port to connect to
 //   caCertFile containing the broker CA certificate for TLS connections
 //   userName of user that is connecting, or thingID of device
@@ -339,7 +268,7 @@ func NewMqttHubClient(hostPort string, caCertFile string, userName string, passw
 
 // NewMqttHubClient creates a new hub connection for use by Plugins
 // Plugins use a client certificate to authenticate.
-//  pluginID is the username (no pass needed) to identify as
+//  pluginID is the instance ID of the plugin to identify as
 //  hubConfig with mqtt listening ports and certificate location
 func NewMqttHubPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) *MqttHubClient {
 
@@ -359,7 +288,7 @@ func NewMqttHubPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) *Mq
 
 // NewMqttHubDeviceClient creates a new hub mqtt connection for devices that publish Things.
 // devices authenticate with a client certificate assigned during provisioning.
-//   deviceID thingID of the device connecting
+//   deviceID instance ID of the device connecting
 //   hostPort address and port to connect to. This must use the mqtt cert port
 //   caCertFile CA certificate for verifying the TLS connections
 //   clientCertFile client certificate to identify the device

@@ -2,7 +2,6 @@ package hubclient_test
 
 import (
 	"os"
-	"os/exec"
 	"path"
 	"sync"
 	"testing"
@@ -32,9 +31,9 @@ const mosquittoConfigFile = "mosquitto-test.conf"
 const testPluginID = "test-user"
 
 // easy cleanup for existing  certificate
-func removeCerts(folder string) {
-	_, _ = exec.Command("sh", "-c", "rm -f "+path.Join(folder, "*.pem")).Output()
-}
+// func removeCerts(folder string) {
+// 	_, _ = exec.Command("sh", "-c", "rm -f "+path.Join(folder, "*.pem")).Output()
+// }
 
 // TestMain - launch mosquitto
 func TestMain(m *testing.M) {
@@ -52,7 +51,7 @@ func TestMain(m *testing.M) {
 
 	configFolder := path.Join(home, "config")
 	// clean start
-	removeCerts(certsFolder)
+	// removeCerts(certsFolder)
 	certsetup.CreateCertificateBundle(hostnames, certsFolder)
 	// MQTT port hardcoded to 33100
 	mosqConfigPath := path.Join(configFolder, mosquittoConfigFile)

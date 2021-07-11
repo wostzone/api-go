@@ -77,16 +77,16 @@ func CreateMosquittoConf(port int, homeFolder string) string {
 //
 // Run TeardownTestEnv() to end the mosquitto broker
 //  homeFolder is the home directory to run from
-//  mqttPort is the port to listen on, default (0) is 33100
+//  mqttPort is the port to listen on (required)
 // Returns the mosquitto process
 func Setup(homeFolder string, mqttPort int) (mqCmd *exec.Cmd) {
 	hostnames := []string{"localhost"}
 	if mqttPort == 0 {
-		mqttPort = 33100 // must match hub.yaml
+		logrus.Panic("Missing mqtt port in test environment Setup")
+		// mqttPort = 33100 // must match hub.yaml
+		os.Exit(1)
 	}
 	certsFolder := path.Join(homeFolder, "certs")
-	// configFolder := path.Join(homeFolder, "config")
-
 	certsetup.CreateCertificateBundle(hostnames, certsFolder)
 
 	logrus.Infof("--- Starting mosquitto broker ---")

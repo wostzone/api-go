@@ -201,16 +201,41 @@ func LoadHubConfig(homeFolder string) (*HubConfig, error) {
 		hubConfig.PluginFolder = path.Join(homeFolder, hubConfig.PluginFolder)
 	}
 
-	err2 := ValidateConfig(hubConfig)
+	err2 := ValidateHubConfig(hubConfig)
 	if err2 != nil {
 		return hubConfig, err2
 	}
 	return hubConfig, nil
 }
 
-// ValidateConfig checks if values in the hub configuration are correct
+// LoadPluginConfig loads the plugin configuration from file
+//
+// This uses the -home and -c commandline arguments commands without the flag package.
+// Intended for plugins or Hub apps that have their own commandlines.
+//
+// The plugin configuration is the {pluginName}.yaml. If no pluginName is given it is ignored.
+//
+//  configFolder with the location of the plugin configuration
+//  pluginName is the plugin instance name used to determine the config filename
+//  pluginConfig is the configuration to load. nil to only load the hub config.
+// Returns nil on success or error
+func LoadPluginConfig(configFolder string, pluginName string, pluginConfig interface{}) error {
+
+	// plugin config is optional
+	if pluginName != "" && pluginConfig != nil {
+		pluginConfigFile := path.Join(configFolder, pluginName+".yaml")
+		err := LoadConfig(pluginConfigFile, pluginConfig)
+		if err != nil {
+			logrus.Infof("Plugin configuration file %s not found. Ignored", pluginConfigFile)
+		}
+	}
+
+	return nil
+}
+
+// ValidateHubConfig checks if values in the hub configuration are correct
 // Returns an error if the config is invalid
-func ValidateConfig(config *HubConfig) error {
+func ValidateHubConfig(config *HubConfig) error {
 	if _, err := os.Stat(config.Home); os.IsNotExist(err) {
 		logrus.Errorf("Home folder '%s' not found\n", config.Home)
 		return err

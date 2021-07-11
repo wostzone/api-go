@@ -21,7 +21,7 @@ func TestDefaultConfigNoHome(t *testing.T) {
 	// This changes depends on whether to run as debug, coverage or F5 run
 	hc := hubconfig.CreateDefaultHubConfig("")
 	require.NotNil(t, hc)
-	err := hubconfig.ValidateConfig(hc)
+	err := hubconfig.ValidateHubConfig(hc)
 	_ = err // unpredictable outcome
 	// assert.NoError(t, err)
 	hc = hubconfig.CreateDefaultHubConfig("./")
@@ -38,7 +38,7 @@ func TestDefaultConfigWithHome(t *testing.T) {
 	logrus.Infof("TestDefaultConfig: Current folder is %s", wd)
 	hc := hubconfig.CreateDefaultHubConfig(home)
 	require.NotNil(t, hc)
-	err := hubconfig.ValidateConfig(hc)
+	err := hubconfig.ValidateHubConfig(hc)
 	assert.NoError(t, err)
 }
 
@@ -52,7 +52,7 @@ func TestLoadHubConfig(t *testing.T) {
 	// err := hubconfig.LoadHubConfig(configFile, hc)
 	hc, err := hubconfig.LoadHubConfig(homeFolder)
 	assert.NoError(t, err)
-	err = hubconfig.ValidateConfig(hc)
+	err = hubconfig.ValidateHubConfig(hc)
 	assert.NoError(t, err)
 	assert.Equal(t, "info", hc.Loglevel)
 }
@@ -83,24 +83,24 @@ func TestLoadHubConfigBadFolders(t *testing.T) {
 
 	wd, _ := os.Getwd()
 	hc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
-	err := hubconfig.ValidateConfig(hc)
+	err := hubconfig.ValidateHubConfig(hc)
 	assert.NoError(t, err, "Default config should be okay")
 
 	gc2 := *hc
 	gc2.Home = "/not/a/home/folder"
-	err = hubconfig.ValidateConfig(&gc2)
+	err = hubconfig.ValidateHubConfig(&gc2)
 	assert.Error(t, err)
 	gc2 = *hc
 	gc2.ConfigFolder = "./doesntexist"
-	err = hubconfig.ValidateConfig(&gc2)
+	err = hubconfig.ValidateHubConfig(&gc2)
 	assert.Error(t, err)
 	gc2 = *hc
 	gc2.LogFile = "/this/path/doesntexist"
-	err = hubconfig.ValidateConfig(&gc2)
+	err = hubconfig.ValidateHubConfig(&gc2)
 	assert.Error(t, err)
 	gc2 = *hc
 	gc2.CertsFolder = "./doesntexist"
-	err = hubconfig.ValidateConfig(&gc2)
+	err = hubconfig.ValidateHubConfig(&gc2)
 	assert.Error(t, err)
 	gc2 = *hc
 	// gc2.PluginFolder = "./doesntexist"
