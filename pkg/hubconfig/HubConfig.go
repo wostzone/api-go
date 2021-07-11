@@ -4,6 +4,7 @@ package hubconfig
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 
@@ -21,8 +22,8 @@ const HubLogFile = "hub.log"
 const DefaultCertsFolder = "./certs"
 
 // DefaultPort for MQTT or Websocket over TLS port
-const DefaultPortMqtt = 9883
-const DefaultPortWS = 9884
+const DefaultPortMqtt = 8883
+const DefaultPortWS = 8884
 
 type test interface {
 	hello()
@@ -31,24 +32,22 @@ type test interface {
 // HubConfig with hub configuration parameters
 // Intended for hub plugins to provide hub services
 type HubConfig struct {
-	Logging struct {
-		Loglevel   string `yaml:"logLevel"`   // debug, info, warning, error. Default is warning
-		LogFile    string `yaml:"logFile"`    // hub logging to file
-		TimeFormat string `yaml:"timeFormat"` // go default ISO8601 ("2006-01-02T15:04:05.000-0700")
-	} `yaml:"logging"`
+	// logging
+	Loglevel   string `yaml:"logLevel"`   // debug, info, warning, error. Default is warning
+	LogFile    string `yaml:"logFile"`    // hub logging to file
+	TimeFormat string `yaml:"timeFormat"` // go default ISO8601 ("2006-01-02T15:04:05.000-0700")
 
-	// Configuration of hub client messaging
-	// FIXME: support multiple ports for different auths
-	Messenger struct {
-		Address      string `yaml:"address"`                // address with hostname or ip of the message bus
-		CertPortMqtt int    `yaml:"certPortMqtt,omitempty"` // MQTT TLS port for certificate based authentication, default is 9883
-		UnpwPortWS   int    `yaml:"unpwPortWS,omitempty"`   // Websocket TLS port for login/password authentication, default is 9884
-		Signing      bool   `yaml:"signing,omitempty"`      // Message signing to be used by all publishers, default is false
-		Timeout      int    `yaml:"timeout,omitempty"`      // Client connection timeout in seconds. 0 for indefinite
-	} `yaml:"messenger"`
+	// MQTT message bus configuration
+	MqttAddress    string `yaml:"mqttAddress,omitempty"`    // address with hostname or ip of the message bus
+	MqttCertPort   int    `yaml:"mqttCertPort,omitempty"`   // MQTT TLS port for certificate based authentication, default is 9883
+	MqttUnpwPortWS int    `yaml:"mqttUnpwPortWS,omitempty"` // Websocket TLS port for login/password authentication, default is 9884
+	MqttTimeout    int    `yaml:"mqttTimeout,omitempty"`    // Client connection timeout in seconds. 0 for indefinite
 
+	// zoning
+	Zone string `yaml:"zone"` // zone this hub belongs to. Used as prefix in ThingID, default is local
+
+	// Folders
 	Home         string   `yaml:"home"`         // application home directory. Default is parent of executable.
-	Zone         string   `yaml:"zone"`         // zone this hub belongs to. Used as prefix in ThingID, default is local
 	CertsFolder  string   `yaml:"certsFolder"`  // Folder containing certificates, default is {home}/certs
 	ConfigFolder string   `yaml:"configFolder"` // location of configuration files. Default is ./config
 	PluginFolder string   `yaml:"pluginFolder"` // location of plugin binaries. Default is ./bin
@@ -91,13 +90,33 @@ func CreateDefaultHubConfig(homeFolder string) *HubConfig {
 	// config.Messenger.ServerCertFile = certsetup.ServerCertFile
 	// config.Messenger.ClientCertFile = certsetup.ClientCertFile
 	// config.Messenger.ClientKeyFile = certsetup.ClientKeyFile
-	config.Messenger.Address = "localhost"
-	config.Messenger.CertPortMqtt = DefaultPortMqtt
-	config.Messenger.UnpwPortWS = DefaultPortWS
-	config.Logging.Loglevel = "warning"
+	config.MqttAddress = GetOutboundIP("").String()
+	config.MqttCertPort = DefaultPortMqtt
+	config.MqttUnpwPortWS = DefaultPortWS
+	config.Loglevel = "warning"
 	// config.Logging.LogFile = path.Join(homeFolder, "logs/"+HubLogFile)
-	config.Logging.LogFile = path.Join(homeFolder, "./logs/"+HubLogFile)
+	config.LogFile = path.Join(homeFolder, "./logs/"+HubLogFile)
 	return config
+}
+
+// Get the default outbound IP address to reach the given hostname.
+// Use a local hostname if a subnet other than the default one should be used.
+// Use "" for the default route address
+//  destination to reach or "" to use 1.1.1.1 (no connection will be established)
+func GetOutboundIP(destination string) net.IP {
+	if destination == "" {
+		destination = "1.1.1.1"
+	}
+	// This dial command doesn't actually create a connection
+	conn, err := net.Dial("udp", destination+":80")
+	if err != nil {
+		logrus.Errorf("GetIPAddr: %s", err)
+		return nil
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP
 }
 
 // LoadConfig loads the configuration from file into the given config
@@ -201,7 +220,7 @@ func ValidateConfig(config *HubConfig) error {
 		return err
 	}
 
-	loggingFolder := path.Dir(config.Logging.LogFile)
+	loggingFolder := path.Dir(config.LogFile)
 	if _, err := os.Stat(loggingFolder); os.IsNotExist(err) {
 		logrus.Errorf("Logging folder '%s' not found\n", loggingFolder)
 		return err
@@ -220,7 +239,7 @@ func ValidateConfig(config *HubConfig) error {
 	// }
 
 	// Address must exist
-	if config.Messenger.Address == "" {
+	if config.MqttAddress == "" {
 		err := fmt.Errorf("Message bus address not provided\n")
 		logrus.Error(err)
 		return err

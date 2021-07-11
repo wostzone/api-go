@@ -14,7 +14,7 @@ import (
 //  returns with the command or error. Use cmd.Process.Kill to terminate.
 func Launch(configFile string) (*exec.Cmd, error) {
 
-	logrus.Infof("--- Starting mosquitto broker ---")
+	logrus.Infof("--- testenv: Starting mosquitto broker ---")
 
 	// mosquitto must be in the path
 	cmd := exec.Command("mosquitto", "-c", configFile)

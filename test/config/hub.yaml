@@ -1,16 +1,14 @@
 # Example hub configuration
 
 # Message bus server
-messenger:
-  address: "localhost"
-  certPortMqtt: 33100 # certificate based auth over MQTT/TLS
-  unpwPortWS: 33101 # username password auth over WebSocket/TLS
-  timeout: 1
+mqttAddress: "localhost"
+mqttPortCert: 33100 # certificate based auth over MQTT/TLS
+mqttUnpwPortWS: 33101 # username password auth over WebSocket/TLS
+mqttTimeout: 1
 
 # Logging
-logging:
-  #logFile: "../logs/hub.log" # relative to the home directory
-  logLevel: "info" # debug, info, warning, error. Default is warning
+#logFile: "../logs/hub.log" # relative to the home directory
+logLevel: "info" # debug, info, warning, error. Default is warning
 
 #configFolder: "./config" # plugin config, relative to the home directory
 certsFolder: "./certs" # set to activate TLS. Relative to app home directory

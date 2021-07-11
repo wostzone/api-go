@@ -36,7 +36,7 @@ func removeCerts(folder string) {
 	_, _ = exec.Command("sh", "-c", "rm -f "+path.Join(folder, "*.pem")).Output()
 }
 
-// setup - launch mosquitto
+// TestMain - launch mosquitto
 func TestMain(m *testing.M) {
 	hostnames := []string{"localhost"}
 	cwd, _ := os.Getwd()
@@ -54,6 +54,7 @@ func TestMain(m *testing.M) {
 	// clean start
 	removeCerts(certsFolder)
 	certsetup.CreateCertificateBundle(hostnames, certsFolder)
+	// MQTT port hardcoded to 33100
 	mosqConfigPath := path.Join(configFolder, mosquittoConfigFile)
 
 	mosquittoCmd, err := testenv.Launch(mosqConfigPath)

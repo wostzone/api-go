@@ -37,12 +37,12 @@ func SetHubCommandlineArgs(config *HubConfig) {
 
 	flag.StringVar(&config.CertsFolder, "certsFolder", config.CertsFolder, "Optional certificates directory for TLS")
 	flag.StringVar(&config.ConfigFolder, "configFolder", config.ConfigFolder, "Plugin configuration `folder`")
-	flag.StringVar(&config.Messenger.Address, "mqttAddress", config.Messenger.Address, "Message bus hostname or address")
-	flag.IntVar(&config.Messenger.CertPortMqtt, "certPortMqtt", config.Messenger.CertPortMqtt, "MQTT TLS client port")
-	flag.IntVar(&config.Messenger.UnpwPortWS, "unpwPortWS", config.Messenger.UnpwPortWS, "Websocket TLS client port")
-	flag.StringVar(&config.Logging.LogFile, "logFile", config.Logging.LogFile, "Log to file")
+	flag.StringVar(&config.MqttAddress, "mqttAddress", config.MqttAddress, "Message bus hostname or address")
+	flag.IntVar(&config.MqttCertPort, "mqttCertPort", config.MqttCertPort, "MQTT TLS client port")
+	flag.IntVar(&config.MqttUnpwPortWS, "mqttUnpwPortWS", config.MqttUnpwPortWS, "Websocket TLS client port")
+	flag.StringVar(&config.LogFile, "logFile", config.LogFile, "Log to file")
 	flag.StringVar(&config.PluginFolder, "pluginFolder", config.PluginFolder, "Alternate plugin `folder`. Empty to not load plugins.")
-	flag.StringVar(&config.Logging.Loglevel, "logLevel", config.Logging.Loglevel, "Loglevel: {error|`warning`|info|debug}")
+	flag.StringVar(&config.Loglevel, "logLevel", config.Loglevel, "Loglevel: {error|`warning`|info|debug}")
 }
 
 // LoadPluginConfig loads the hub and plugin configuration
@@ -96,27 +96,30 @@ func LoadCommandlineConfig(homeFolder string, pluginName string, pluginConfig in
 	}
 
 	SetHubCommandlineArgs(hubConfig)
+
 	// catch parsing errors, in case flag.ErrorHandling = flag.ContinueOnError
 	err = flag.CommandLine.Parse(os.Args[1:])
 
-	// Second validation pass in case commandline argument messed up the config
-	if err == nil {
-		err = ValidateConfig(hubConfig)
-		// if err != nil {
-		// 	logrus.Errorf("Commandline configuration invalid: %s", err)
-		// }
+	if err != nil {
+		return hubConfig, err
 	}
+
+	// Second validation pass in case commandline argument messed up the config
+	err = ValidateConfig(hubConfig)
+	// if err != nil {
+	// 	logrus.Errorf("Commandline configuration invalid: %s", err)
+	// }
 
 	// It is up to the app to change to the home directory.
 	// os.Chdir(hubConfig.HomeFolder)
 
 	// Last set the hub/plugin logging
 	if pluginName != "" {
-		logFolder := path.Dir(hubConfig.Logging.LogFile)
+		logFolder := path.Dir(hubConfig.LogFile)
 		logFileName := path.Join(logFolder, pluginName+".log")
-		SetLogging(hubConfig.Logging.Loglevel, logFileName, hubConfig.Logging.TimeFormat)
-	} else if hubConfig.Logging.LogFile != "" {
-		SetLogging(hubConfig.Logging.Loglevel, hubConfig.Logging.LogFile, hubConfig.Logging.TimeFormat)
+		SetLogging(hubConfig.Loglevel, logFileName, hubConfig.TimeFormat)
+	} else if hubConfig.LogFile != "" {
+		SetLogging(hubConfig.Loglevel, hubConfig.LogFile, hubConfig.TimeFormat)
 	}
 	return hubConfig, err
 }

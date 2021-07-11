@@ -54,7 +54,7 @@ func TestLoadHubConfig(t *testing.T) {
 	assert.NoError(t, err)
 	err = hubconfig.ValidateConfig(hc)
 	assert.NoError(t, err)
-	assert.Equal(t, "info", hc.Logging.Loglevel)
+	assert.Equal(t, "info", hc.Loglevel)
 }
 
 func TestLoadHubConfigNotFound(t *testing.T) {
@@ -95,7 +95,7 @@ func TestLoadHubConfigBadFolders(t *testing.T) {
 	err = hubconfig.ValidateConfig(&gc2)
 	assert.Error(t, err)
 	gc2 = *hc
-	gc2.Logging.LogFile = "/this/path/doesntexist"
+	gc2.LogFile = "/this/path/doesntexist"
 	err = hubconfig.ValidateConfig(&gc2)
 	assert.Error(t, err)
 	gc2 = *hc

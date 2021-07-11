@@ -1,20 +1,18 @@
 # Example hub configuration
 
 # Message bus server
-messenger:
-  address: "localhost"
-  certPortMqtt: 33100 # certificate based auth over MQTT/TLS
-  unpwPortWS: 33101 # username password auth over WebSocket/TLS
-  timeout: 1
+mqttAddress: "localhost"
+mqttCertPort: 33100 # certificate based auth over MQTT/TLS
+mqttUnpwPortWS: 33101 # username password auth over WebSocket/TLS
+mqttTimeout: 1
 
 # invalid because the folder doesn't exist
 certsFolder: "/invalid/folder" # set to activate TLS
 
 # Logging
-logging:
-  # logFile: "/var/log/wost/hub.log"
-  # loglevel is used in test to verify the file was actually loaded
-  logLevel: "debug" # debug, info, warning, error. Default is warning
+# logFile: "/var/log/wost/hub.log"
+# loglevel is used in test to verify the file was actually loaded
+logLevel: "debug" # debug, info, warning, error. Default is warning
 
 # Plugins to start
 plugins: # list of plugins to start

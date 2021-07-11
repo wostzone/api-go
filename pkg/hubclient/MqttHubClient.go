@@ -42,39 +42,6 @@ type MqttHubClient struct {
 	// senderVerification bool
 }
 
-// RequestProvisioning sends a request to (re)provision this device
-// This subscribes to a response and waits a few seconds
-// func (client *MqttHubClient) RequestProvisioning(thingID string, csrPEM []byte, waitSec uint,
-// ) (certPEM []byte, timeout bool) {
-// 	done := make(chan bool, 1)
-
-// 	// listen for the response
-// 	// TODO: MQTT 5 supports request-response
-// 	respTopic := strings.ReplaceAll(TopicProvisionResponse, "{id}", thingID)
-// 	client.mqttClient.Subscribe(respTopic, func(address string, message []byte) {
-// 		certPEM = message
-// 		timeout = false
-// 		done <- true
-// 	})
-
-// 	reqTopic := strings.ReplaceAll(TopicProvisionRequest, "{id}", thingID)
-// 	err := client.mqttClient.Publish(reqTopic, csrPEM)
-// 	if err != nil {
-// 		return nil, true
-// 	}
-
-// 	// wait for response or timeout
-// 	select {
-// 	case <-done:
-// 		logrus.Infof("RequestProvisioning: Received response")
-// 	case <-time.After(time.Second * time.Duration(waitSec)):
-// 		logrus.Infof("RequestProvisioning: timeout after %d seconds", waitSec)
-// 		timeout = true
-// 	}
-// 	client.mqttClient.Unsubscribe(respTopic)
-// 	return certPEM, timeout
-// }
-
 // Start the client connection
 func (client *MqttHubClient) Start() error {
 	logrus.Infof("Starting MQTT Hub client. Connecting to '%s'. CaCertFile '%s'",
@@ -364,6 +331,8 @@ func NewMqttHubClient(hostPort string, caCertFile string, userName string, passw
 	client := &MqttHubClient{
 		timeoutSec: 3,
 		mqttClient: NewMqttClient(hostPort, caCertFile),
+		userName:   userName,
+		password:   password,
 	}
 	return client
 }
@@ -377,7 +346,7 @@ func NewMqttHubPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) *Mq
 	caCertPath := path.Join(hubConfig.CertsFolder, certsetup.CaCertFile)
 	pluginCertPath := path.Join(hubConfig.CertsFolder, certsetup.PluginCertFile)
 	pluginKeyPath := path.Join(hubConfig.CertsFolder, certsetup.PluginKeyFile)
-	hostPort := fmt.Sprintf("%s:%d", hubConfig.Messenger.Address, hubConfig.Messenger.CertPortMqtt)
+	hostPort := fmt.Sprintf("%s:%d", hubConfig.MqttAddress, hubConfig.MqttCertPort)
 	client := &MqttHubClient{
 		timeoutSec:     3,
 		clientCertFile: pluginCertPath,

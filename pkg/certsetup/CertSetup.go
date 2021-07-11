@@ -208,7 +208,7 @@ func CreateHubCA() (certPEM string, keyPEM string) {
 		IsCA:                  true,
 		MaxPathLen:            0,
 		MaxPathLenZero:        true,
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		// IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
 	}
 
 	// Create the CA private key

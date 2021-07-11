@@ -27,10 +27,10 @@ persistence false
 #acl_file {{.homeFolder}}/config/mosquitto.acl
 
 
-#--- Consumers authenticate using a password
+#--- plugins and devices use certificates with MQTT
 # MQTT over TLS/SSL
-listener {{.clientPortMqtt}}
-require_certificate false
+listener {{.certPortMqtt}}
+require_certificate true
 tls_version tlsv1.2
 cafile {{.homeFolder}}/certs/caCert.pem
 keyfile {{.homeFolder}}/certs/hubKey.pem
@@ -39,8 +39,8 @@ certfile {{.homeFolder}}/certs/hubCert.pem
 #password_file {{.homeFolder}}/config/mosquitto-passwd
 
 
-# WebSockets over TLS/SSL
-listener {{.clientPortWS}}
+#--- consumers use username/pw with WebSockets over TLS/SSL
+listener {{.unpwPortWS}}
 protocol websockets
 require_certificate false
 tls_version tlsv1.2
@@ -50,25 +50,6 @@ certfile {{.homeFolder}}/certs/hubCert.pem
 # Password Authentication for users
 #password_file {{.homeFolder}}/config/mosquitto-passwd
 
-
-#--- Plugins authenticate using client certificate
-# Plugin authentication MQTT over TLS/SSL with client certificate
-listener {{.pluginPortMqtt}}
-require_certificate true
-tls_version tlsv1.2
-cafile {{.homeFolder}}/certs/caCert.pem
-keyfile {{.homeFolder}}/certs/hubKey.pem
-certfile {{.homeFolder}}/certs/hubCert.pem
-
-# Thing and Consumer authentication MQTT over TLS/SSL with login and password
-listener {{.pluginPortWS}}
-protocol websockets
-require_certificate true
-cafile {{.homeFolder}}/certs/caCert.pem
-keyfile {{.homeFolder}}/certs/hubKey.pem
-certfile {{.homeFolder}}/certs/hubCert.pem
-# password_file ./config/mosquitto-passwd.txt
-tls_version tlsv1.2
 `
 
 // Createa mosquitto.conf file for testing
@@ -77,11 +58,9 @@ func CreateMosquittoConf(port int, homeFolder string) string {
 	var msg bytes.Buffer
 
 	params := map[string]string{
-		"homeFolder":     homeFolder,
-		"clientPortMqtt": fmt.Sprint(port),
-		"clientPortWS":   fmt.Sprint(port + 1), // FIXME, not like this :(
-		"pluginPortMqtt": fmt.Sprint(port + 2),
-		"pluginPortWS":   fmt.Sprint(port + 3),
+		"homeFolder":   homeFolder,
+		"certPortMqtt": fmt.Sprint(port),
+		"unpwPortWS":   fmt.Sprint(port + 1), // FIXME, not like this :(
 	}
 	tpl, err := template.New("").Parse(mqConfigTemplate)
 	_ = err
