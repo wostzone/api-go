@@ -21,7 +21,7 @@ const ConnectionTimeoutSec = 20
 // MqttClient client wrapper around pahoClient
 // This addresses problems with reconnect and auto resubscribe while using clean session
 type MqttClient struct {
-	clientID string // unique ID of the client (used for logging)
+	// clientID string // unique ID of the client (used for logging)
 	hostPort string // host:port of server to connect to
 	pubQos   byte
 	subQos   byte
@@ -53,19 +53,26 @@ type TopicSubscription struct {
 //  userName to authenticate with. Use "" to ignore
 //  password to authenticate with. Use "" to ignore
 func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName string, password string) error {
-	// set config defaults
+
+	// ClientID defaults to hostname-millisecondsSinceEpoc
+	hostName, _ := os.Hostname()
+	timeStamp := time.Now().UnixNano() / 1000000
+	clientID := fmt.Sprintf("%s-%s-%d", hostName, userName, timeStamp)
 
 	// close existing connection
 	if mqttClient.pahoClient != nil && mqttClient.pahoClient.IsConnected() {
 		mqttClient.pahoClient.Disconnect(10 * ConnectionTimeoutSec)
 	}
 
-	brokerURL := fmt.Sprintf("tls://%s/", mqttClient.hostPort) // tcp://host:1883 ws://host:1883 tls://host:8883, tcps://awshost:8883/mqtt
-	// brokerURL := fmt.Sprintf("tls://mqtt.eclipse.org:8883/")
+	// tls://host:8883, tcps://awshost:8883/mqtt, or wss://host:8884/
+	brokerURL := fmt.Sprintf("tls://%s/", mqttClient.hostPort)
+	if clientCert == nil {
+		brokerURL = fmt.Sprintf("wss://%s/", mqttClient.hostPort)
+	}
 	opts := pahomqtt.NewClientOptions()
 
 	opts.AddBroker(brokerURL)
-	opts.SetClientID(mqttClient.clientID)
+	opts.SetClientID(clientID)
 	opts.SetAutoReconnect(true)
 	opts.SetConnectTimeout(10 * time.Second)
 	opts.SetMaxReconnectInterval(60 * time.Second) // max wait 1 minute for a reconnect
@@ -77,13 +84,13 @@ func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName stri
 
 	opts.SetOnConnectHandler(func(client pahomqtt.Client) {
 		logrus.Warningf("MqttClient.onConnect: Connected to server at %s. Connected=%v. ClientId=%s",
-			brokerURL, client.IsConnected(), mqttClient.clientID)
+			brokerURL, client.IsConnected(), clientID)
 		// Subscribe to addresss already registered by the app on connect or reconnect
 		mqttClient.resubscribe()
 	})
 	opts.SetConnectionLostHandler(func(client pahomqtt.Client, err error) {
 		logrus.Warningf("MqttClient.onConnectionLost: Disconnected from server %s. Error %s, ClientId=%s",
-			brokerURL, err, mqttClient.clientID)
+			brokerURL, err, clientID)
 	})
 	// if lastWillAddress != "" {
 	// 	opts.SetWill(lastWillAddress, lastWillValue, 1, false)
@@ -113,10 +120,14 @@ func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName stri
 		opts.Username = userName
 		opts.Password = password
 	}
+	// testing, remove when done
+	// if password == "" {
+	// 	opts.Password = userName
+	// }
 	opts.SetTLSConfig(tlsConfig)
 
 	logrus.Infof("MqttClient.Connect: Connecting to MQTT server: %s with clientID=%s, username=%s, client-certificate: %v",
-		brokerURL, mqttClient.clientID, userName, (clientCert != nil))
+		brokerURL, clientID, userName, (clientCert != nil))
 
 	// FIXME: PahoMqtt disconnects when sending a lot of messages, like on startup of some adapters.
 	mqttClient.pahoClient = pahomqtt.NewClient(opts)
@@ -191,7 +202,8 @@ func (mqttClient *MqttClient) Disconnect() {
 	mqttClient.updateMutex.Unlock()
 
 	if mqttClient.pahoClient != nil {
-		logrus.Warningf("MqttClient.Disconnect: Client %s", mqttClient.clientID)
+		opts := mqttClient.pahoClient.OptionsReader()
+		logrus.Warningf("MqttClient.Disconnect: Client %s", opts.ClientID())
 		//messenger.publish("$state", "disconnected")
 		time.Sleep(time.Second / 10) // Disconnect doesn't seem to wait for all messages. A small delay ahead helps
 		mqttClient.pahoClient.Disconnect(10 * ConnectionTimeoutSec * 1000)
@@ -345,12 +357,12 @@ func (mqttClient *MqttClient) Unsubscribe(topic string) {
 func NewMqttClient(hostPort string, caCertFile string) *MqttClient {
 
 	// ClientID defaults to hostname-millisecondsSinceEpoc
-	hostName, _ := os.Hostname()
-	timeStamp := time.Now().UnixNano() / 1000000
-	clientID := fmt.Sprintf("%s-%d", hostName, timeStamp)
+	// hostName, _ := os.Hostname()
+	// timeStamp := time.Now().UnixNano() / 1000000
+	// clientID := fmt.Sprintf("%s-%s-%d", hostName, username, timeStamp)
 
 	messenger := &MqttClient{
-		clientID:      clientID,
+		// clientID:      clientID,
 		hostPort:      hostPort,
 		pubQos:        1,
 		subQos:        1,

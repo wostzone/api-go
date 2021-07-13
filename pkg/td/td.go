@@ -2,6 +2,7 @@ package td
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -104,7 +105,7 @@ func SetTDForms(td ThingTD, formList []map[string]interface{}) {
 }
 
 // CreateThingID creates a ThingID from the zone it belongs to, the hardware device ID and device Type
-// This creates a Thing ID: URN:zone:deviceID:deviceType
+// This creates a Thing ID: URN:zone:deviceID:deviceType.
 //  zone is the name of the zone the device is part of
 //  deviceID is the ID of the device to use as part of the Thing ID
 func CreateThingID(zone string, deviceID string, deviceType vocab.DeviceType) string {
@@ -115,11 +116,11 @@ func CreateThingID(zone string, deviceID string, deviceType vocab.DeviceType) st
 // CreatePublisherThingID creates a globally unique Thing ID that includes the zone and publisher
 // name where the Thing originates from. The publisher is especially useful where protocol
 // bindings create thing IDs. In this case the publisher is the gateway used by the protocol binding
-// or the PB itself.
+// or the PB itself.  See also SplitThingID.
 //
 // This creates a Thing ID: URN:zone:publisher:deviceID:deviceType
 //  zone is the name of the zone the device is part of
-//  publisher is the name of the publisher that the thing originates from.
+//  publisher is the deviceID of the publisher of the thing.
 //  deviceID is the ID of the device to use as part of the Thing ID
 func CreatePublisherThingID(zone string, publisher string, deviceID string, deviceType vocab.DeviceType) string {
 	thingID := fmt.Sprintf("urn:%s:%s:%s:%s", zone, publisher, deviceID, deviceType)
@@ -140,4 +141,34 @@ func CreateTD(thingID string, deviceType vocab.DeviceType) ThingTD {
 	td[vocab.WoTEvents] = make(map[string]interface{})
 	td[vocab.WoTProperties] = make(map[string]interface{})
 	return td
+}
+
+// SplitThingID takes a ThingID and breaks it down into individual parts. Supported formats:
+//  A thingID without anything specific: URN:deviceID
+//  A thingID without zone: URN:deviceID:deviceType
+//  A thingID without publisher: URN:zone:deviceID:deviceType.
+//  A thingID with publisher: URN:zone:publisherID:deviceID:deviceType.
+//  thingID is the multi-part identified of the thing and the device it is part of
+func SplitThingID(thingID string) (
+	zone string, publisherID string, deviceID string, deviceType vocab.DeviceType) {
+	parts := strings.Split(thingID, ":")
+	if len(parts) < 2 || strings.ToLower(parts[0]) != "urn" {
+		// not a conventional thing ID
+		return "", "", "", ""
+	} else if len(parts) == 5 {
+		zone = parts[1]
+		publisherID = parts[2]
+		deviceID = parts[3]
+		deviceType = vocab.DeviceType(parts[4])
+	} else if len(parts) == 4 {
+		zone = parts[1]
+		deviceID = parts[2]
+		deviceType = vocab.DeviceType(parts[3])
+	} else if len(parts) == 3 {
+		deviceID = parts[1]
+		deviceType = vocab.DeviceType(parts[2])
+	} else if len(parts) == 2 {
+		deviceID = parts[1]
+	}
+	return
 }

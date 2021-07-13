@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	home := path.Join(cwd, "../../test")
 	os.Chdir(home)
 	certsFolder := path.Join(home, "certs")
-	hubconfig.SetLogging("info", "", "")
+	hubconfig.SetLogging("info", "")
 
 	mqttTestCaCertFile = path.Join(certsFolder, certsetup.CaCertFile)
 	mqttTestCaKeyFile = path.Join(certsFolder, certsetup.CaKeyFile)

@@ -33,9 +33,8 @@ type test interface {
 // Intended for hub plugins to provide hub services
 type HubConfig struct {
 	// logging
-	Loglevel   string `yaml:"logLevel"`   // debug, info, warning, error. Default is warning
-	LogFile    string `yaml:"logFile"`    // hub logging to file
-	TimeFormat string `yaml:"timeFormat"` // go default ISO8601 ("2006-01-02T15:04:05.000-0700")
+	Loglevel string `yaml:"logLevel"` // debug, info, warning, error. Default is warning
+	LogFile  string `yaml:"logFile"`  // hub logging to file
 
 	// MQTT message bus configuration
 	MqttAddress    string `yaml:"mqttAddress,omitempty"`    // address with hostname or ip of the message bus

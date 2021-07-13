@@ -70,9 +70,9 @@ func LoadCommandlineConfig(homeFolder string, pluginName string, pluginConfig in
 	if pluginName != "" {
 		logFolder := path.Dir(hubConfig.LogFile)
 		logFileName := path.Join(logFolder, pluginName+".log")
-		SetLogging(hubConfig.Loglevel, logFileName, hubConfig.TimeFormat)
+		SetLogging(hubConfig.Loglevel, logFileName)
 	} else if hubConfig.LogFile != "" {
-		SetLogging(hubConfig.Loglevel, hubConfig.LogFile, hubConfig.TimeFormat)
+		SetLogging(hubConfig.Loglevel, hubConfig.LogFile)
 	}
 	return hubConfig, err
 }

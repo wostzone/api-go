@@ -13,11 +13,11 @@ import (
 )
 
 // SetLogging sets the logging level and output file
+// This sets the timeFormat to ISO8601 YYYY-MM-DDTHH:MM:SS.sss-TZ
 // Intended for standardize logging in the hub and plugins
 //  levelName is the requested logging level: error, warning, info, debug
 //  filename is the output log file full name including path, use "" for stderr
-//  timeFormat default is ISO8601 YYYY-MM-DDTHH:MM:SS.sss-TZ
-func SetLogging(levelName string, filename string, timeFormat string) error {
+func SetLogging(levelName string, filename string) error {
 	loggingLevel := logrus.DebugLevel
 	var err error
 	logrus.SetReportCaller(true)
