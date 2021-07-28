@@ -29,8 +29,8 @@ const (
 	HubKeyFile     = "hubKey.pem"
 	PluginCertFile = "pluginCert.pem"
 	PluginKeyFile  = "pluginKey.pem"
-	// ClientCertFile = "clientCert.pem"
-	// ClientKeyFile  = "clientKey.pem"
+	// AdminCertFile = "adminCert.pem"
+	// AdminKeyFile  = "adminKey.pem"
 )
 
 // Organization Unit for client authorization are stored in the client certificate OU field

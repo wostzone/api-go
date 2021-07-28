@@ -38,26 +38,7 @@ type MqttHubClient struct {
 	password string
 	//
 	mqttClient *MqttClient
-	timeoutSec int
 	// senderVerification bool
-}
-
-// Start the client connection
-func (client *MqttHubClient) Start() error {
-	logrus.Infof("Starting MQTT Hub client. Connecting to '%s'. CaCertFile '%s'",
-		client.mqttClient.hostPort, client.mqttClient.tlsCACertFile)
-	// client.senderVerification = senderVerification
-	client.mqttClient.SetTimeout(client.timeoutSec)
-	if client.clientCertFile != "" && client.clientKeyFile != "" {
-		return client.mqttClient.ConnectWithClientCert(client.userName, client.clientCertFile, client.clientKeyFile)
-	} else {
-		return client.mqttClient.ConnectWithPassword(client.userName, client.password)
-	}
-}
-
-// End the client connection
-func (client *MqttHubClient) Stop() {
-	client.mqttClient.Disconnect()
 }
 
 // PublishAction publish a Thing action request to the Hub
@@ -102,6 +83,24 @@ func (client *MqttHubClient) PublishTD(thingID string, td map[string]interface{}
 	message, _ := json.Marshal(td)
 	err := client.mqttClient.Publish(topic, message)
 	return err
+}
+
+// Start the client connection
+func (client *MqttHubClient) Start() error {
+	logrus.Warningf("MqttHubClient.Start: Username='%s', connecting to '%s'. CaCertFile '%s'",
+		client.userName, client.mqttClient.hostPort, client.mqttClient.tlsCACertFile)
+	// client.senderVerification = senderVerification
+	if client.clientCertFile != "" && client.clientKeyFile != "" {
+		return client.mqttClient.ConnectWithClientCert(client.userName, client.clientCertFile, client.clientKeyFile)
+	} else {
+		return client.mqttClient.ConnectWithPassword(client.userName, client.password)
+	}
+}
+
+// End the client connection
+func (client *MqttHubClient) Stop() {
+	logrus.Warningf("MqttHubClient.Stop")
+	client.mqttClient.Disconnect()
 }
 
 // Subscribe subscribes to messages from Things
@@ -258,8 +257,7 @@ func (client *MqttHubClient) Unsubscribe(thingID string) {
 func NewMqttHubClient(hostPort string, caCertFile string, userName string, password string) *MqttHubClient {
 
 	client := &MqttHubClient{
-		timeoutSec: 3,
-		mqttClient: NewMqttClient(hostPort, caCertFile),
+		mqttClient: NewMqttClient(hostPort, caCertFile, DefaultTimeoutSec),
 		userName:   userName,
 		password:   password,
 	}
@@ -277,11 +275,10 @@ func NewMqttHubPluginClient(pluginID string, hubConfig *hubconfig.HubConfig) *Mq
 	pluginKeyPath := path.Join(hubConfig.CertsFolder, certsetup.PluginKeyFile)
 	hostPort := fmt.Sprintf("%s:%d", hubConfig.MqttAddress, hubConfig.MqttCertPort)
 	client := &MqttHubClient{
-		timeoutSec:     hubConfig.MqttTimeout,
 		clientCertFile: pluginCertPath,
 		clientKeyFile:  pluginKeyPath,
 		userName:       pluginID,
-		mqttClient:     NewMqttClient(hostPort, caCertPath),
+		mqttClient:     NewMqttClient(hostPort, caCertPath, hubConfig.MqttTimeout),
 	}
 	return client
 }
@@ -297,11 +294,10 @@ func NewMqttHubDeviceClient(deviceID string, hostPort string,
 	caCertFile string, deviceCertFile string, deviceKeyFile string) *MqttHubClient {
 
 	client := &MqttHubClient{
-		timeoutSec:     3,
 		clientCertFile: deviceCertFile,
 		clientKeyFile:  deviceKeyFile,
 		userName:       deviceID,
-		mqttClient:     NewMqttClient(hostPort, caCertFile),
+		mqttClient:     NewMqttClient(hostPort, caCertFile, DefaultTimeoutSec),
 	}
 	return client
 }

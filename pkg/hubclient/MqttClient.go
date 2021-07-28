@@ -15,8 +15,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ConnectionTimeoutSec constant with connection and reconnection timeouts
-const ConnectionTimeoutSec = 20
+// DefaultTimeoutSec constant with connection, reconnection and disconnection timeouts
+const DefaultTimeoutSec = 3
+
+// Time a keep alive ping is sent. This is the max wait time to discover a broken connection
+const DefaultKeepAliveSec = 10
 
 // MqttClient client wrapper around pahoClient
 // This addresses problems with reconnect and auto resubscribe while using clean session
@@ -25,7 +28,7 @@ type MqttClient struct {
 	hostPort string // host:port of server to connect to
 	pubQos   byte
 	subQos   byte
-	timeout  int // connection timeout in seconds before giving up. 0 is never
+	timeout  int // connection timeout in seconds before giving up.
 	//
 	isRunning           bool                          // listen for messages while running
 	pahoClient          pahomqtt.Client               // Paho MQTT Client
@@ -49,19 +52,20 @@ type TopicSubscription struct {
 // this keeps retrying until the timeout is expired. With each retry a backoff period
 // is increased until 120 seconds.
 // The clientID is generated from the hostname and current timestamp.
-//  clientCert to authenticate with client certificate. Use nil to authenticate with username/password
-//  userName to authenticate with. Use "" to ignore
+//  userName to authenticate with. Use plugin ID for certificate
 //  password to authenticate with. Use "" to ignore
-func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName string, password string) error {
+//  clientCert to authenticate with client certificate. Use nil to authenticate with username/password
+func (mqttClient *MqttClient) Connect(username string, password string, clientCert *tls.Certificate) error {
+	logrus.Infof("MqttClient.Connect. username='%s', has clientCert '%v'", username, (clientCert != nil))
 
 	// ClientID defaults to hostname-millisecondsSinceEpoc
 	hostName, _ := os.Hostname()
 	timeStamp := time.Now().UnixNano() / 1000000
-	clientID := fmt.Sprintf("%s-%s-%d", hostName, userName, timeStamp)
+	clientID := fmt.Sprintf("%s-%s-%d", hostName, username, timeStamp)
 
 	// close existing connection
 	if mqttClient.pahoClient != nil && mqttClient.pahoClient.IsConnected() {
-		mqttClient.pahoClient.Disconnect(10 * ConnectionTimeoutSec)
+		mqttClient.pahoClient.Disconnect(1000 * DefaultTimeoutSec)
 	}
 
 	// tls://host:8883, tcps://awshost:8883/mqtt, or wss://host:8884/
@@ -79,7 +83,7 @@ func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName stri
 	// Do not use MQTT persistence as not all brokers support it, and it causes problems on the broker if the client ID is
 	// randomly generated. CleanSession disables persistence.
 	opts.SetCleanSession(true)
-	opts.SetKeepAlive(ConnectionTimeoutSec * time.Second) // pings to detect a disconnect. Use same as reconnect interval
+	opts.SetKeepAlive(DefaultKeepAliveSec * time.Second) // pings to detect a disconnect. Use same as reconnect interval
 	//opts.SetKeepAlive(60) // keepalive causes deadlock in v1.1.0. See github issue #126
 
 	opts.SetOnConnectHandler(func(client pahomqtt.Client) {
@@ -117,7 +121,7 @@ func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName stri
 		tlsConfig.Certificates = []tls.Certificate{*clientCert}
 	}
 	if password != "" {
-		opts.Username = userName
+		opts.Username = username
 		opts.Password = password
 	}
 	// testing, remove when done
@@ -127,7 +131,7 @@ func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName stri
 	opts.SetTLSConfig(tlsConfig)
 
 	logrus.Infof("MqttClient.Connect: Connecting to MQTT server: %s with clientID=%s, username=%s, client-certificate: %v",
-		brokerURL, clientID, userName, (clientCert != nil))
+		brokerURL, clientID, username, (clientCert != nil))
 
 	// FIXME: PahoMqtt disconnects when sending a lot of messages, like on startup of some adapters.
 	mqttClient.pahoClient = pahomqtt.NewClient(opts)
@@ -171,7 +175,7 @@ func (mqttClient *MqttClient) Connect(clientCert *tls.Certificate, userName stri
 //  userName to identify as
 //  password credentials to identify with
 func (mqttClient *MqttClient) ConnectWithPassword(userName string, password string) error {
-	err := mqttClient.Connect(nil, userName, password)
+	err := mqttClient.Connect(userName, password, nil)
 	return err
 }
 
@@ -180,8 +184,11 @@ func (mqttClient *MqttClient) ConnectWithPassword(userName string, password stri
 //  clientCertFile optional client certificate to authenticate the client with the broker
 //  clientKeyFile  optional client key to authenticate the client with the broker
 func (mqttClient *MqttClient) ConnectWithClientCert(pluginID string, clientCertFile string, clientKeyFile string) error {
+	logrus.Infof("MqttClient.ConnectWithClientCert: pluginID='%s'", pluginID)
+
 	if clientCertFile == "" || clientKeyFile == "" {
-		err := mqttClient.Connect(nil, "", "")
+		// no authentication? This will likely fail
+		err := mqttClient.Connect("", "", nil)
 		return err
 	}
 	clientCert, err := tls.LoadX509KeyPair(clientCertFile, clientKeyFile)
@@ -189,7 +196,7 @@ func (mqttClient *MqttClient) ConnectWithClientCert(pluginID string, clientCertF
 		logrus.Errorf("ConnectWithClientCert: Failed to connect. Error loading certificates: %s", err)
 		return err
 	}
-	err = mqttClient.Connect(&clientCert, pluginID, "")
+	err = mqttClient.Connect(pluginID, "", &clientCert)
 	return err
 
 }
@@ -204,13 +211,11 @@ func (mqttClient *MqttClient) Disconnect() {
 	if mqttClient.pahoClient != nil {
 		opts := mqttClient.pahoClient.OptionsReader()
 		logrus.Warningf("MqttClient.Disconnect: Client %s", opts.ClientID())
-		//messenger.publish("$state", "disconnected")
 		time.Sleep(time.Second / 10) // Disconnect doesn't seem to wait for all messages. A small delay ahead helps
-		mqttClient.pahoClient.Disconnect(10 * ConnectionTimeoutSec * 1000)
+		mqttClient.pahoClient.Disconnect(DefaultTimeoutSec * 1000)
 		mqttClient.pahoClient = nil
 
-		mqttClient.subscriptions = make(map[string]*TopicSubscription, 0)
-		//close(messenger.messageChannel)     // end the message handler loop
+		mqttClient.subscriptions = make(map[string]*TopicSubscription)
 	}
 }
 
@@ -285,11 +290,11 @@ func (mqttClient *MqttClient) resubscribe() {
 	logrus.Debugf("MqttClient.resubscribe complete")
 }
 
-// Set the connection timeout for the client.
-// Must be invoked before the connect() call
-func (MqttClient *MqttClient) SetTimeout(sec int) {
-	MqttClient.timeout = sec
-}
+// // Set the connection timeout for the client.
+// // Must be invoked before the connect() call
+// func (MqttClient *MqttClient) SetTimeout(sec int) {
+// 	MqttClient.timeout = sec
+// }
 
 // Subscribe to a address
 // If a subscription already exists, it is replaced.
@@ -352,15 +357,15 @@ func (mqttClient *MqttClient) Unsubscribe(topic string) {
 // by the CA used by the broker, so that the broker can authenticate the client. Leave empty when
 // not using client certificates. See ConnectWithPassword or ConnectWithClientCert for
 // the two methods of authentication.
+// To avoid hanging, keep the timeout low, if 0 is provided the default of 3 seconds is used
+//
 //  hostPort to connect to
 //  caCertFile is a PEM file containing the server CA certificate filename
-func NewMqttClient(hostPort string, caCertFile string) *MqttClient {
-
-	// ClientID defaults to hostname-millisecondsSinceEpoc
-	// hostName, _ := os.Hostname()
-	// timeStamp := time.Now().UnixNano() / 1000000
-	// clientID := fmt.Sprintf("%s-%s-%d", hostName, username, timeStamp)
-
+//  timeoutSec to attempt connecting before it is considered failed
+func NewMqttClient(hostPort string, caCertFile string, timeoutSec int) *MqttClient {
+	if timeoutSec <= 0 {
+		timeoutSec = DefaultTimeoutSec
+	}
 	messenger := &MqttClient{
 		// clientID:      clientID,
 		hostPort:      hostPort,
@@ -369,6 +374,7 @@ func NewMqttClient(hostPort string, caCertFile string) *MqttClient {
 		pahoClient:    nil,
 		subscriptions: make(map[string]*TopicSubscription, 0),
 		//messageChannel: make(chan *IncomingMessage),
+		timeout:             timeoutSec,
 		tlsCACertFile:       caCertFile,
 		tlsVerifyServerCert: true,
 		updateMutex:         &sync.Mutex{},

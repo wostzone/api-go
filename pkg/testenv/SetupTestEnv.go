@@ -34,8 +34,6 @@ tls_version tlsv1.2
 cafile {{.homeFolder}}/certs/caCert.pem
 keyfile {{.homeFolder}}/certs/hubKey.pem
 certfile {{.homeFolder}}/certs/hubCert.pem
-# Password Authentication for users
-#password_file {{.homeFolder}}/config/mosquitto-passwd
 
 
 #--- consumers use username/pw with WebSockets over TLS/SSL
@@ -46,7 +44,7 @@ tls_version tlsv1.2
 cafile {{.homeFolder}}/certs/caCert.pem
 keyfile {{.homeFolder}}/certs/hubKey.pem
 certfile {{.homeFolder}}/certs/hubCert.pem
-# Password Authentication for users
+# No password needed for users
 #password_file {{.homeFolder}}/config/mosquitto-passwd
 
 `

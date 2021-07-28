@@ -8,22 +8,21 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"path"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"github.com/wostzone/wostlib-go/pkg/certsetup"
 )
 
 // Simple TLS Server
 type TLSServer struct {
-	address    string
-	port       uint
-	certFolder string
-	httpServer *http.Server
-	router     *mux.Router
+	address        string
+	port           uint
+	caCertPath     string
+	serverCertPath string
+	serverKeyPath  string
+	httpServer     *http.Server
+	router         *mux.Router
 }
 
 // AddHandler adds a new handler for a path.
@@ -49,22 +48,14 @@ func (srv *TLSServer) Start() error {
 	logrus.Infof("TLSServer.Start: Starting TLS server on address: %s:%d", srv.address, srv.port)
 	srv.router = mux.NewRouter()
 
-	caCertPath := path.Join(srv.certFolder, certsetup.CaCertFile)
-	_, err := os.Stat(caCertPath)
-	if os.IsNotExist(err) {
-		logrus.Errorf("TLSServer.Start: Missing CA certificate %s", caCertPath)
-		return err
-	}
-	hubCertPath := path.Join(srv.certFolder, certsetup.HubCertFile)
-	hubKeyPath := path.Join(srv.certFolder, certsetup.HubKeyFile)
-	hubCertPEM, err := ioutil.ReadFile(hubCertPath)
-	hubKeyPEM, err2 := ioutil.ReadFile(hubKeyPath)
+	hubCertPEM, err := ioutil.ReadFile(srv.serverCertPath)
+	hubKeyPEM, err2 := ioutil.ReadFile(srv.serverKeyPath)
 	hubCert, err3 := tls.X509KeyPair(hubCertPEM, hubKeyPEM)
 	if err != nil || err2 != nil || err3 != nil {
 		logrus.Errorf("TLSServer.Start: Server certificate pair not found")
 		return err
 	}
-	caCertPEM, err := ioutil.ReadFile(caCertPath)
+	caCertPEM, err := ioutil.ReadFile(srv.caCertPath)
 	if err != nil {
 		return err
 	}
@@ -123,17 +114,19 @@ func (srv *TLSServer) Stop() {
 // Create a new TLS Server instance. Use Start/Stop to run and close connections
 //  address listening address
 //  port listening port
-//  certFolder folder with ca, server certs and key (see certsetup for certificate creation
-// and standard naming.
+//  caCertPath
+//  caKeyPath
+//  serverCertPath
+//  serverKeyPath
 //
 // returns TLS server for handling requests
-func NewTLSServer(address string, port uint, certFolder string) *TLSServer {
-	srv := &TLSServer{}
-	// get the certificates ready
-	if certFolder == "" {
-		certFolder = "./certs"
+func NewTLSServer(address string, port uint,
+	serverCertPath string, serverKeyPath string, caCertPath string) *TLSServer {
+	srv := &TLSServer{
+		caCertPath:     caCertPath,
+		serverCertPath: serverCertPath,
+		serverKeyPath:  serverKeyPath,
 	}
-	srv.certFolder = certFolder
 	srv.address = address
 	srv.port = port
 	return srv
