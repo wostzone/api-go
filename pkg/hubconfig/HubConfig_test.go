@@ -11,11 +11,6 @@ import (
 	"github.com/wostzone/wostlib-go/pkg/hubconfig"
 )
 
-type ConfigType1 struct {
-	C1 string
-	c2 string
-}
-
 func TestDefaultConfigNoHome(t *testing.T) {
 	// This result is unpredictable as it depends on where the binary lives.
 	// This changes depends on whether to run as debug, coverage or F5 run
@@ -58,7 +53,7 @@ func TestLoadHubConfig(t *testing.T) {
 }
 
 func TestSubstitute(t *testing.T) {
-	substMap := make(map[string]string, 0)
+	substMap := make(map[string]string)
 	substMap["pluginID"] = "plugin1"
 	hc := hubconfig.HubConfig{}
 	wd, _ := os.Getwd()

@@ -8,6 +8,7 @@ import (
 
 	"github.com/grandcat/zeroconf"
 	"github.com/sirupsen/logrus"
+	"github.com/wostzone/wostlib-go/pkg/hubnet"
 )
 
 // ServeDiscovery publishes a WoST service for discovery.
@@ -56,7 +57,7 @@ func ServeDiscovery(instanceID string, serviceName string,
 		ips = []string{actualIP[0].String()}
 	}
 
-	ifaces, err := GetInterfaces(ips[0])
+	ifaces, err := hubnet.GetInterfaces(ips[0])
 	if err != nil || len(ifaces) == 0 {
 		logrus.Warningf("ServeDiscovery: Address %s does not appear on any interface. Continuing anyways", ips[0])
 	}

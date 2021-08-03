@@ -82,7 +82,6 @@ func TestMqttConnectWithCert(t *testing.T) {
 
 func TestMqttConnectWithUnpw(t *testing.T) {
 	logrus.Infof("--- TestMqttConnectWithUnpw ---")
-	// (this doesn't use a password for this test)
 	username := "user1"
 	password := "user1"
 

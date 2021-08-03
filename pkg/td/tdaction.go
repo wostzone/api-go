@@ -8,7 +8,7 @@ import "github.com/wostzone/wostlib-go/pkg/vocab"
 //  description optional extra description of what the action does
 // Returns an action object
 func CreateTDAction(title string, description string) map[string]interface{} {
-	action := make(map[string]interface{}, 0)
+	action := make(map[string]interface{})
 	action[vocab.WoTTitle] = title
 	action[vocab.WoTDescription] = description
 
@@ -21,7 +21,7 @@ func CreateTDAction(title string, description string) map[string]interface{} {
 //
 // This returns a message that can be published with IHubClient.PublishConfigRequest()
 func CreateActionRequest(name string, params map[string]interface{}) map[string]interface{} {
-	action := make(map[string]interface{}, 0)
+	action := make(map[string]interface{})
 	action[name] = params
 	return action
 }
@@ -36,7 +36,7 @@ func SetTDActionInput(action map[string]interface{},
 	properties map[string]interface{},
 	requiredProperties []string) {
 
-	input := make(map[string]interface{}, 0)
+	input := make(map[string]interface{})
 	input[vocab.WoTDataType] = inputDataType
 	input[vocab.WoTProperties] = properties
 	input[vocab.WoTRequired] = requiredProperties
@@ -57,7 +57,7 @@ func SetTDActionForms(action map[string]interface{}, forms []map[string]interfac
 //  action to add output to
 //  outputType "object", "string", "number", "int"
 func SetTDActionOutput(action map[string]interface{}, outputType string) {
-	output := make(map[string]interface{}, 0)
+	output := make(map[string]interface{})
 	output[vocab.WoTDataType] = outputType
 	action[vocab.WoTOutput] = output
 }

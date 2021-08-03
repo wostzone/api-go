@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"path"
 	"text/template"
 
 	"github.com/sirupsen/logrus"
+	"github.com/wostzone/wostlib-go/pkg/hubnet"
 	"gopkg.in/yaml.v2"
 )
 
@@ -23,10 +23,6 @@ const DefaultCertsFolder = "./certs"
 // DefaultPort for MQTT or Websocket over TLS port
 const DefaultPortWS = 8883
 const DefaultPortMqtt = 8884
-
-type test interface {
-	hello()
-}
 
 // HubConfig with hub configuration parameters
 // Intended for hub plugins to provide hub services
@@ -53,11 +49,11 @@ type HubConfig struct {
 }
 
 // ConfigArgs configuration commandline arguments
-type ConfigArgs struct {
-	name         string
-	defaultValue string
-	description  string
-}
+// type ConfigArgs struct {
+// 	name         string
+// 	defaultValue string
+// 	description  string
+// }
 
 // CreateDefaultHubConfig with default values
 // homeFolder is the home of the application, log and configuration folders.
@@ -86,32 +82,12 @@ func CreateDefaultHubConfig(homeFolder string) *HubConfig {
 	// config.Messenger.ServerCertFile = certsetup.ServerCertFile
 	// config.Messenger.ClientCertFile = certsetup.ClientCertFile
 	// config.Messenger.ClientKeyFile = certsetup.ClientKeyFile
-	config.MqttAddress = GetOutboundIP("").String()
+	config.MqttAddress = hubnet.GetOutboundIP("").String()
 	config.MqttCertPort = DefaultPortMqtt
 	config.MqttUnpwPortWS = DefaultPortWS
 	config.Loglevel = "warning"
 	config.LogFolder = path.Join(homeFolder, "logs")
 	return config
-}
-
-// Get the default outbound IP address to reach the given hostname.
-// Use a local hostname if a subnet other than the default one should be used.
-// Use "" for the default route address
-//  destination to reach or "" to use 1.1.1.1 (no connection will be established)
-func GetOutboundIP(destination string) net.IP {
-	if destination == "" {
-		destination = "1.1.1.1"
-	}
-	// This dial command doesn't actually create a connection
-	conn, err := net.Dial("udp", destination+":80")
-	if err != nil {
-		logrus.Errorf("GetIPAddr: %s", err)
-		return nil
-	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP
 }
 
 // LoadConfig loads the configuration from file into the given config
@@ -284,7 +260,7 @@ func ValidateHubConfig(config *HubConfig) error {
 
 	// Address must exist
 	if config.MqttAddress == "" {
-		err := fmt.Errorf("Message bus address not provided\n")
+		err := fmt.Errorf("message bus address not provided")
 		logrus.Error(err)
 		return err
 	}

@@ -10,25 +10,21 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/wostzone/wostlib-go/pkg/certsetup"
 )
 
-// Simple TLS Client
+// Simple TLS Client with authentication using certificates and login/pw methods
 type TLSClient struct {
-	address        string
-	port           uint
-	clientCert     *x509.Certificate
-	clientCertPath string
-	clientKeyPath  string
-	caCertPath     string
-	httpClient     *http.Client
-	timeout        time.Duration
+	address    string
+	port       uint
+	clientCert *x509.Certificate
+	caCertPath string
+	httpClient *http.Client
+	timeout    time.Duration
 }
 
 // ClientCertificate returns the client certificate or nil if none is used
@@ -36,61 +32,121 @@ func (cl *TLSClient) Certificate() *x509.Certificate {
 	return cl.clientCert
 }
 
-// GetOutboundInterface Get preferred outbound network interface of this machine
-// Credits: https://stackoverflow.com/questions/23558425/how-do-i-get-the-local-ip-address-in-go
-// and https://qiita.com/shaching/items/4c2ee8fd2914cce8687c
-func GetOutboundInterface(address string) (interfaceName string, macAddress string, ipAddr net.IP) {
-	if address == "" {
-		address = "1.1.1.1"
+// Close the connection with the server
+func (cl *TLSClient) Close() {
+	logrus.Infof("TLSClient.Close: Closing client connection")
+
+	if cl.httpClient != nil {
+		cl.httpClient.CloseIdleConnections()
+		cl.httpClient = nil
 	}
-
-	// This dial command doesn't actually create a connection
-	conn, err := net.Dial("udp", address+":9999")
-	if err != nil {
-		logrus.Errorf("GetOutboundInterface for address '%s': %s", address, err)
-		return "", "", nil
-	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	ipAddr = localAddr.IP
-
-	// find the first interface for this address
-	interfaces, _ := net.Interfaces()
-	for _, interf := range interfaces {
-
-		if addrs, err := interf.Addrs(); err == nil {
-			for index, addr := range addrs {
-				logrus.Debug("[", index, "]", interf.Name, ">", addr)
-
-				// only interested in the name with current IP address
-				if strings.Contains(addr.String(), ipAddr.String()) {
-					logrus.Debug("GetOutboundInterface: Use name : ", interf.Name)
-					interfaceName = interf.Name
-					macAddress = fmt.Sprint(interf.HardwareAddr)
-					break
-				}
-			}
-		}
-	}
-	// netInterface, err = net.InterfaceByName(interfaceName)
-	// macAddress = netInterface.HardwareAddr
-	// fmt.Println("MAC: ", macAddress)
-	return
 }
 
-// testing
-func (cl *TLSClient) Post(path string, msg interface{}) ([]byte, error) {
-	var data []byte
-	url := fmt.Sprintf("https://%s:%d/%s", cl.address, cl.port, path)
+// Connect connection with the server using a client certificate for mutual authentication.
+// This requires a matching CA certificate
+//  clientCertFile path to client certificate PEM file if available, "" if not available
+//  clientKeyFile path to client key PEM file if available, "" if not available
+// Returns nil if successful, or an error if connection failed
+func (cl *TLSClient) ConnectWithClientCert(clientCertPath string, clientKeyPath string) (err error) {
+	var clientCertList []tls.Certificate = []tls.Certificate{}
+	var checkServerCert = false
 
-	bodyBytes, _ := json.Marshal(msg)
-	body := bytes.NewReader(bodyBytes)
-	resp, err := cl.httpClient.Post(url, "", body)
+	// Use CA certificate for server authentication if it exists
+	// caCertPEM, err := certsetup.LoadPEM(cl.certFolder, certsetup.CaCertFile)
+	caCertPEM, err := certsetup.LoadPEM("", cl.caCertPath)
+	caCertPool := x509.NewCertPool()
 	if err == nil {
-		data, err = ioutil.ReadAll(resp.Body)
+		logrus.Infof("TLSClient.ConnectWithClientCert: destination '%s:%d'. CA certificate '%s'",
+			cl.address, cl.port, cl.caCertPath)
+		caCertPool.AppendCertsFromPEM([]byte(caCertPEM))
+		checkServerCert = true
+	} else {
+		logrus.Infof("TLSClient.ConnectWithClientCert: destination '%s:%d'. No CA certificate at '%s'. InsecureSkipVerify used",
+			cl.address, cl.port, cl.caCertPath)
+		checkServerCert = false
 	}
-	return data, err
+
+	// Use client certificate for mutual authentication with the server
+	clientCertPEM, _ := certsetup.LoadPEM("", clientCertPath)
+	clientKeyPEM, _ := certsetup.LoadPEM("", clientKeyPath)
+	if clientCertPEM != "" && clientKeyPEM != "" {
+		logrus.Infof("TLSClient.ConnectWithClientCert: Using client certificate from %s for mutual auth", certsetup.PluginCertFile)
+		cl.clientCert, err = certsetup.CertFromPEM(clientCertPEM)
+		if err != nil {
+			logrus.Error("TLSClient.ConnectWithClientCert: Invalid client certificate PEM: ", err)
+			return err
+		}
+		tlsCert, err := tls.X509KeyPair([]byte(clientCertPEM), []byte(clientKeyPEM))
+
+		if err != nil {
+			logrus.Errorf("TLSClient.ConnectWithClientCert: Cannot create TLS certificate from PEM: %s", err)
+			return err
+		}
+		clientCertList = append(clientCertList, tlsCert)
+	} else {
+		logrus.Infof("TLSClient.ConnectWithClientCert, No client key/certificate in '%s'. Mutual auth disabled.", clientKeyPath)
+	}
+	tlsConfig := &tls.Config{
+		RootCAs:            caCertPool,
+		Certificates:       clientCertList,
+		InsecureSkipVerify: !checkServerCert,
+	}
+
+	tlsTransport := http.DefaultTransport
+	tlsTransport.(*http.Transport).TLSClientConfig = tlsConfig
+
+	cl.httpClient = &http.Client{
+		Transport: tlsTransport,
+		Timeout:   cl.timeout,
+	}
+	return nil
+}
+
+// Connect with the server using loginID/password authentication.
+// If a CA certificate is not available then insecure-skip-verify is used to allow
+// connection to an unverified server (leap of faith).
+//  loginID username or application ID to identify as.
+//  password to authenticate with. Use "" if the server does not require authentication
+// Returns nil if successful, or an error if connection failed
+func (cl *TLSClient) ConnectWithLoginID(loginID string, password string) (err error) {
+	var checkServerCert = false
+
+	// Use CA certificate for server authentication if it exists
+	// caCertPEM, err := certsetup.LoadPEM(cl.certFolder, certsetup.CaCertFile)
+	caCertPEM, err := certsetup.LoadPEM("", cl.caCertPath)
+	caCertPool := x509.NewCertPool()
+	if err == nil {
+		logrus.Infof("TLSClient.ConnectWithLoginID: destination '%s:%d'. CA certificate '%s' for server verification",
+			cl.address, cl.port, cl.caCertPath)
+		caCertPool.AppendCertsFromPEM([]byte(caCertPEM))
+		checkServerCert = true
+	} else {
+		logrus.Infof("TLSClient.ConnectWithLoginID, destination '%s:%d'. No CA certificate at '%s'. InsecureSkipVerify used",
+			cl.address, cl.port, cl.caCertPath)
+		checkServerCert = false
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs:            caCertPool,
+		InsecureSkipVerify: !checkServerCert,
+	}
+	// tlsTransport := http.Transport{
+	// 	TLSClientConfig: tlsConfig,
+	// }
+	tlsTransport := http.DefaultTransport
+	tlsTransport.(*http.Transport).TLSClientConfig = tlsConfig
+
+	cl.httpClient = &http.Client{
+		Transport: tlsTransport,
+		Timeout:   cl.timeout,
+	}
+	return nil
+}
+
+// Get is a convenience function to send a request
+//  path to invoke
+func (cl *TLSClient) Get(path string) ([]byte, error) {
+	return cl.Invoke("GET", path, nil)
 }
 
 // invoke a HTTPS method and read response
@@ -98,11 +154,12 @@ func (cl *TLSClient) Post(path string, msg interface{}) ([]byte, error) {
 //  method: GET, PUT, POST, ...
 //  addr the server to connect to
 //  path to invoke
-//  msg body to include
+//  msg message object to include. This will be marshalled to json
 func (cl *TLSClient) Invoke(method string, path string, msg interface{}) ([]byte, error) {
-	var body io.Reader
+	var body io.Reader = http.NoBody
 	var err error
 	var req *http.Request
+	contentType := "application/json"
 
 	if cl == nil || cl.httpClient == nil {
 		logrus.Errorf("Invoke: '%s'. Client is not started", path)
@@ -120,7 +177,10 @@ func (cl *TLSClient) Invoke(method string, path string, msg interface{}) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	// cl.httpClient.
+
+	// set headers
+	req.Header.Set("Content-Type", contentType)
+
 	resp, err := cl.httpClient.Do(req)
 	if err != nil {
 		logrus.Errorf("TLSClient.Invoke: %s %s: %s", method, path, err)
@@ -141,76 +201,18 @@ func (cl *TLSClient) Invoke(method string, path string, msg interface{}) ([]byte
 	return respBody, err
 }
 
-// Start the client.
-// If a CA certificate is not available then insecure-skip-verify is used to allow
-// connection to an unverified server (leap of faith).
-// If a CA and client certificate are available then mutual TLS authentication is used.
-// Returns nil if successful, or an error if start failed
-func (cl *TLSClient) Start() (err error) {
-	var clientCertList []tls.Certificate = []tls.Certificate{}
-	var checkServerCert = false
-
-	// Use CA certificate for server authentication if it exists
-	// caCertPEM, err := certsetup.LoadPEM(cl.certFolder, certsetup.CaCertFile)
-	caCertPEM, err := certsetup.LoadPEM("", cl.caCertPath)
-	caCertPool := x509.NewCertPool()
-	if err == nil {
-		logrus.Infof("TLSClient.Start: Using CA certificate in '%s' for server verification", cl.caCertPath)
-		caCertPool.AppendCertsFromPEM([]byte(caCertPEM))
-		checkServerCert = true
-	} else {
-		logrus.Infof("TLSClient.Start, No CA certificate at '%s'. InsecureSkipVerify used", cl.caCertPath)
-		checkServerCert = false
-	}
-
-	// Use client certificate for mutual authentication with the server
-	clientCertPEM, _ := certsetup.LoadPEM("", cl.clientCertPath)
-	clientKeyPEM, _ := certsetup.LoadPEM("", cl.clientKeyPath)
-	if clientCertPEM != "" && clientKeyPEM != "" {
-		logrus.Infof("TLSClient.Start: Using client certificate from %s for mutual auth", certsetup.PluginCertFile)
-		cl.clientCert, err = certsetup.CertFromPEM(clientCertPEM)
-		if err != nil {
-			logrus.Error("TLSClient.Start: Invalid client certificate PEM: ", err)
-			return err
-		}
-		tlsCert, err := tls.X509KeyPair([]byte(clientCertPEM), []byte(clientKeyPEM))
-
-		if err != nil {
-			logrus.Errorf("TLSClient.Start: Cannot create TLS certificate from PEM: %s", err)
-			return err
-		}
-		clientCertList = append(clientCertList, tlsCert)
-	} else {
-		logrus.Infof("TLSClient.Start, No client key/certificate in '%s'. Mutual auth disabled.", cl.clientKeyPath)
-	}
-	tlsConfig := &tls.Config{
-		RootCAs:            caCertPool,
-		Certificates:       clientCertList,
-		InsecureSkipVerify: !checkServerCert,
-	}
-	// tlsTransport := http.Transport{
-	// 	TLSClientConfig: tlsConfig,
-	// }
-	tlsTransport := http.DefaultTransport
-	tlsTransport.(*http.Transport).TLSClientConfig = tlsConfig
-
-	cl.httpClient = &http.Client{
-		Transport: tlsTransport,
-		Timeout:   cl.timeout,
-	}
-	return nil
+// Post a message with json payload
+//  path to invoke
+//  msg message object to include. This will be marshalled to json
+func (cl *TLSClient) Post(path string, msg interface{}) ([]byte, error) {
+	return cl.Invoke("POST", path, msg)
 }
 
-// Stop the TLS client
-func (cl *TLSClient) Stop() {
-	// cs.updateMutex.Lock()
-	// defer cs.updateMutex.Unlock()
-	logrus.Infof("TLSClient.Stop: Stopping TLS client")
-
-	if cl.httpClient != nil {
-		cl.httpClient.CloseIdleConnections()
-		cl.httpClient = nil
-	}
+// Put a message with json payload
+//  path to invoke
+//  msg message object to include. This will be marshalled to json
+func (cl *TLSClient) Put(path string, msg interface{}) ([]byte, error) {
+	return cl.Invoke("PUT", path, msg)
 }
 
 // Create a new TLS Client instance.
@@ -220,19 +222,14 @@ func (cl *TLSClient) Stop() {
 // Use Start/Stop to run and close connections
 //  address is the server hostname or IP address to connect to
 //  port to connect to
-//  clientCertFile path to client certificate PEM file if available, "" if not available
-//  clientKeyFile path to client key PEM file if available, "" if not available
 //  caCertFile path to CA certificate PEM file, if available, "" if not available
 // returns TLS client for submitting requests
-func NewTLSClient(address string, port uint,
-	clientCertPath string, clientKeyPath string, caCertPath string) *TLSClient {
+func NewTLSClient(address string, port uint, caCertPath string) *TLSClient {
 	cl := &TLSClient{
-		address:        address,
-		port:           port,
-		timeout:        time.Second,
-		caCertPath:     caCertPath,
-		clientCertPath: clientCertPath,
-		clientKeyPath:  clientKeyPath,
+		address:    address,
+		port:       port,
+		timeout:    time.Second,
+		caCertPath: caCertPath,
 	}
 	return cl
 }

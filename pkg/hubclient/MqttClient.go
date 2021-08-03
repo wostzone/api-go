@@ -181,8 +181,8 @@ func (mqttClient *MqttClient) ConnectWithPassword(userName string, password stri
 
 // Connect to the MQTT broker using client certificate authentication
 //  pluginID to connect as (no pass required)
-//  clientCertFile optional client certificate to authenticate the client with the broker
-//  clientKeyFile  optional client key to authenticate the client with the broker
+//  clientCertFile client certificate to authenticate the client with the broker
+//  clientKeyFile  client key to authenticate the client with the broker
 func (mqttClient *MqttClient) ConnectWithClientCert(pluginID string, clientCertFile string, clientKeyFile string) error {
 	logrus.Infof("MqttClient.ConnectWithClientCert: pluginID='%s'", pluginID)
 

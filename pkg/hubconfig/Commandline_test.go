@@ -6,7 +6,6 @@ import (
 	"path"
 	"strings"
 	"testing"
-	_ "testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,6 @@ type CustomConfig struct {
 
 var homeFolder string
 var customConfig *CustomConfig
-var hubConfig *hubconfig.HubConfig
 
 // Use the test folder during testing
 func setup() {

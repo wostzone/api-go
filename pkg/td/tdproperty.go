@@ -5,15 +5,25 @@ import "github.com/wostzone/wostlib-go/pkg/vocab"
 // Thing property creation
 
 // CreateProperty creates a new property instance
+//  {
+//     @type: propType,
+//     title: title,
+//     description: description,
+//     writable: true,
+//     readOnly: false,
+//     writeOnly: true
+//  }
 //  title propery title for presentation
 //  description optional extra description of what the property does
 //  propType provides @type value for a property
 //  writable property is a configuration value and is writable
-func CreateProperty(title string, description string, propType vocab.ThingPropType) map[string]interface{} {
+func CreateProperty(title string, description string,
+	propType vocab.ThingPropType) map[string]interface{} {
 
 	var writable = (propType == vocab.PropertyTypeConfig)
-	prop := make(map[string]interface{}, 0)
-	prop[vocab.WoTAtType] = propType
+	prop := make(map[string]interface{})
+	// propType must be a string for jsonpath query to succeed
+	prop[vocab.WoTAtType] = string(propType)
 	prop[vocab.WoTTitle] = title
 	if description != "" {
 		prop[vocab.WoTDescription] = description
@@ -48,7 +58,7 @@ func GetPropertyValue(thingTD map[string]interface{}, propName string) (value st
 
 // SetPropertyEnum sets a enumerated list of valid values of a property
 func SetPropertyEnum(prop map[string]interface{}, enumValues ...interface{}) {
-	prop[vocab.WoTEnum] = enumValues
+	prop[string(vocab.WoTEnum)] = enumValues
 }
 
 // SetPropertyDataTypeArray sets the property data type as an array (of ?)
@@ -56,10 +66,10 @@ func SetPropertyEnum(prop map[string]interface{}, enumValues ...interface{}) {
 //  minItems is the minimum nr of items required
 //  maxItems sets the maximum nr of items required
 func SetPropertyDataTypeArray(prop map[string]interface{}, minItems uint, maxItems uint) {
-	prop[vocab.WoTDataType] = vocab.WoTDataTypeArray
+	prop[string(vocab.WoTDataType)] = string(vocab.WoTDataTypeArray)
 	if maxItems > 0 {
-		prop[vocab.WoTMinItems] = minItems
-		prop[vocab.WoTMaxItems] = maxItems
+		prop[string(vocab.WoTMinItems)] = minItems
+		prop[string(vocab.WoTMaxItems)] = maxItems
 	}
 }
 
@@ -68,10 +78,10 @@ func SetPropertyDataTypeArray(prop map[string]interface{}, minItems uint, maxIte
 //  min is the minimum value
 //  max sets the maximum value
 func SetPropertyDataTypeInteger(prop map[string]interface{}, min int, max int) {
-	prop[vocab.WoTDataType] = vocab.WoTDataTypeInteger
+	prop[string(vocab.WoTDataType)] = string(vocab.WoTDataTypeInteger)
 	if !(min == 0 && max == 0) {
-		prop[vocab.WoTMinimum] = min
-		prop[vocab.WoTMaximum] = max
+		prop[string(vocab.WoTMinimum)] = min
+		prop[string(vocab.WoTMaximum)] = max
 	}
 }
 
@@ -80,7 +90,7 @@ func SetPropertyDataTypeInteger(prop map[string]interface{}, min int, max int) {
 //  min is the minimum value
 //  max sets the maximum value
 func SetPropertyDataTypeNumber(prop map[string]interface{}, min float64, max float64) {
-	prop[vocab.WoTDataType] = vocab.WoTDataTypeNumber
+	prop[vocab.WoTDataType] = string(vocab.WoTDataTypeNumber)
 	if !(min == 0 && max == 0) {
 		prop[vocab.WoTMinimum] = min
 		prop[vocab.WoTMaximum] = max
@@ -89,7 +99,7 @@ func SetPropertyDataTypeNumber(prop map[string]interface{}, min float64, max flo
 
 // SetPropertyDataTypeObject sets the property data type as an object
 func SetPropertyDataTypeObject(prop map[string]interface{}, object interface{}) {
-	prop[vocab.WoTDataType] = vocab.WoTDataTypeObject
+	prop[vocab.WoTDataType] = string(vocab.WoTDataTypeObject)
 	prop[vocab.WoTDataTypeObject] = object
 }
 
@@ -98,7 +108,7 @@ func SetPropertyDataTypeObject(prop map[string]interface{}, object interface{}) 
 //  minLength is the minimum value
 //  maxLength sets the maximum value
 func SetPropertyDataTypeString(prop map[string]interface{}, minLength int, maxLength int) {
-	prop["type"] = vocab.WoTDataTypeString
+	prop["type"] = string(vocab.WoTDataTypeString)
 	if !(minLength == 0 && maxLength == 0) {
 		prop[vocab.WoTMinLength] = minLength
 		prop[vocab.WoTMaxLength] = maxLength

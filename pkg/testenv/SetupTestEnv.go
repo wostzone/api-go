@@ -45,6 +45,7 @@ cafile {{.homeFolder}}/certs/caCert.pem
 keyfile {{.homeFolder}}/certs/hubKey.pem
 certfile {{.homeFolder}}/certs/hubCert.pem
 # No password needed for users
+allow_anonymous true
 #password_file {{.homeFolder}}/config/mosquitto-passwd
 
 `

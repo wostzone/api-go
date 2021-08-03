@@ -128,13 +128,24 @@ func CreatePublisherThingID(zone string, publisher string, deviceID string, devi
 }
 
 // CreateTD creates a new Thing Description document with properties, events and actions
+// This creates a structure:
+//   {
+//      @context: "http://www.w3.org/ns/td",
+//      id: <thingID>,
+//      @type: <deviceType>,
+//      created: <iso8601>,
+//      actions: {},
+//      events: {},
+//      properties: {}
+//   }
 func CreateTD(thingID string, deviceType vocab.DeviceType) ThingTD {
-	td := make(ThingTD, 0)
+	td := make(ThingTD)
 	td[vocab.WoTAtContext] = "http://www.w3.org/ns/td"
 	td[vocab.WoTID] = thingID
 	// TODO @type is a JSON-LD keyword to label using semantic tags, eg it needs a schema
 	if deviceType != "" {
-		td[vocab.WoTAtType] = deviceType
+		// deviceType must be a string for serialization and querying
+		td[vocab.WoTAtType] = string(deviceType)
 	}
 	td[vocab.WoTCreated] = time.Now().Format(vocab.TimeFormat)
 	td[vocab.WoTActions] = make(map[string]interface{})

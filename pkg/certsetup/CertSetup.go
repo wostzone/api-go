@@ -88,7 +88,7 @@ func CreateCertificateBundle(names []string, certFolder string) error {
 	caCertPEM, _ := LoadPEM(certFolder, CaCertFile)
 	caKeyPEM, _ := LoadPEM(certFolder, CaKeyFile)
 	if caCertPEM == "" || caKeyPEM == "" {
-		logrus.Warningf("CreateCertificateBundle Generating a CA certificate in %s as none was found", certFolder)
+		logrus.Warningf("CreateCertificateBundle Generating a CA certificate in %s as none was found. Names: %s", certFolder, names)
 		caCertPEM, caKeyPEM = CreateHubCA()
 		err = SaveKeyToPEM(caKeyPEM, certFolder, CaKeyFile)
 		if err != nil {
@@ -233,10 +233,9 @@ func CreateHubCA() (certPEM string, keyPEM string) {
 	// create the CA
 	caCertDer, err := x509.CreateCertificate(rand.Reader, rootTemplate, rootTemplate, &privKey.PublicKey, privKey)
 	if err != nil {
-		logrus.Errorf("CertSetup: Unable to create WoST Hub CA cert: %s", err)
+		logrus.Errorf("CertSetup.CreateHubCA: Unable to create WoST Hub CA cert: %s", err)
 		return "", ""
 	}
-
 	caCertPEM := CertDerToPEM(caCertDer)
 	return caCertPEM, privKeyPEM
 }
@@ -249,6 +248,9 @@ func CreateHubCA() (certPEM string, keyPEM string) {
 //  caCertPEM is the CA to sign the server certificate
 // returns the signed Hub certificate in PEM format
 func CreateHubCert(names []string, hubPublicKeyPEM string, caCertPEM string, caKeyPEM string) (certPEM string, err error) {
+
+	logrus.Infof("CertSetup.CreateHubCA: Refresh Hub certificate for IP/name: %s", names)
+
 	// We need the CA key and certificate
 	caPrivKey, err := signing.PrivateKeyFromPEM(caKeyPEM)
 	if err != nil {

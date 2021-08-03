@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wostzone/wostlib-go/pkg/discovery"
-	"github.com/wostzone/wostlib-go/pkg/hubconfig"
+	"github.com/wostzone/wostlib-go/pkg/hubnet"
 )
 
 const testServiceID = "discovery-test"
@@ -20,7 +20,7 @@ const testServicePort = uint(9999)
 // Test the discovery client and server
 func TestDiscover(t *testing.T) {
 	params := map[string]string{"path": testServicePath}
-	testServiceAddress := hubconfig.GetOutboundIP("").String()
+	testServiceAddress := hubnet.GetOutboundIP("").String()
 
 	discoServer, err := discovery.ServeDiscovery(
 		testServiceID, testServiceName, testServiceAddress, testServicePort, params)
@@ -29,7 +29,7 @@ func TestDiscover(t *testing.T) {
 	assert.NotNil(t, discoServer)
 
 	// Test if it is discovered
-	address, port, discoParams, records, err := discovery.DiscoverService(testServiceName, 1)
+	address, port, discoParams, records, err := discovery.DiscoverServices(testServiceName, 1)
 	require.NoError(t, err)
 	rec0 := records[0]
 	assert.Equal(t, testServiceID, rec0.Instance)
@@ -51,7 +51,7 @@ func TestDiscoViaDomainName(t *testing.T) {
 	assert.NotNil(t, discoServer)
 
 	// Test if it is discovered
-	discoAddress, discoPort, _, records, err := discovery.DiscoverService(testServiceName, 1)
+	discoAddress, discoPort, _, records, err := discovery.DiscoverServices(testServiceName, 1)
 	rec0 := records[0]
 	assert.NoError(t, err)
 	assert.Equal(t, "127.0.0.1", discoAddress)
@@ -65,7 +65,7 @@ func TestDiscoViaDomainName(t *testing.T) {
 func TestDiscoverBadPort(t *testing.T) {
 	serviceID := "idprov-test"
 	badPort := uint(0)
-	address := hubconfig.GetOutboundIP("").String()
+	address := hubnet.GetOutboundIP("").String()
 	_, err := discovery.ServeDiscovery(
 		serviceID, testServiceName, address, badPort, nil)
 
@@ -74,7 +74,7 @@ func TestDiscoverBadPort(t *testing.T) {
 
 func TestNoInstanceID(t *testing.T) {
 	serviceID := "serviceID"
-	address := hubconfig.GetOutboundIP("").String()
+	address := hubnet.GetOutboundIP("").String()
 
 	_, err := discovery.ServeDiscovery(
 		"", testServiceName, address, testServicePort, nil)
@@ -88,7 +88,7 @@ func TestNoInstanceID(t *testing.T) {
 func TestDiscoverNotFound(t *testing.T) {
 	instanceID := "idprov-test-id"
 	serviceName := "idprov-test"
-	address := hubconfig.GetOutboundIP("").String()
+	address := hubnet.GetOutboundIP("").String()
 
 	discoServer, err := discovery.ServeDiscovery(
 		instanceID, serviceName, address, testServicePort, nil)
@@ -96,7 +96,7 @@ func TestDiscoverNotFound(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test if it is discovered
-	discoAddress, discoPort, _, records, err := discovery.DiscoverService("wrongname", 1)
+	discoAddress, discoPort, _, records, err := discovery.DiscoverServices("wrongname", 1)
 	_ = discoAddress
 	_ = discoPort
 	_ = records
