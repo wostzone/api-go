@@ -201,9 +201,9 @@ func (mqttClient *MqttClient) ConnectWithClientCert(pluginID string, clientCertF
 
 }
 
-// Disconnect from the MQTT broker and unsubscribe from all addresss and set
+// Close the connection to the MQTT broker and unsubscribe from all addresss and set
 // device state to disconnected
-func (mqttClient *MqttClient) Disconnect() {
+func (mqttClient *MqttClient) Close() {
 	mqttClient.updateMutex.Lock()
 	mqttClient.isRunning = false
 	mqttClient.updateMutex.Unlock()
@@ -372,7 +372,7 @@ func NewMqttClient(hostPort string, caCertFile string, timeoutSec int) *MqttClie
 		pubQos:        1,
 		subQos:        1,
 		pahoClient:    nil,
-		subscriptions: make(map[string]*TopicSubscription, 0),
+		subscriptions: make(map[string]*TopicSubscription),
 		//messageChannel: make(chan *IncomingMessage),
 		timeout:             timeoutSec,
 		tlsCACertFile:       caCertFile,

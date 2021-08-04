@@ -77,7 +77,7 @@ func TestMqttConnectWithCert(t *testing.T) {
 	// reconnect
 	err = client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.NoError(t, err)
-	client.Disconnect()
+	client.Close()
 }
 
 func TestMqttConnectWithUnpw(t *testing.T) {
@@ -88,7 +88,7 @@ func TestMqttConnectWithUnpw(t *testing.T) {
 	client := hubclient.NewMqttClient(mqttUnpwAuthAddress, mqttTestCaCertFile, hubclient.DefaultTimeoutSec)
 	err := client.ConnectWithPassword(username, password)
 	assert.NoError(t, err)
-	client.Disconnect()
+	client.Close()
 }
 
 func TestMqttConnectWrongAddress(t *testing.T) {
@@ -99,7 +99,7 @@ func TestMqttConnectWrongAddress(t *testing.T) {
 	require.NotNil(t, client)
 	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.Error(t, err)
-	client.Disconnect()
+	client.Close()
 }
 
 func TestMQTTPubSub(t *testing.T) {
@@ -108,9 +108,6 @@ func TestMQTTPubSub(t *testing.T) {
 	var rx string
 	rxMutex := sync.Mutex{}
 	var msg1 = "Hello world"
-	// clientID := "test"
-	const timeout = 10
-	// certFolder := ""
 
 	client := hubclient.NewMqttClient(mqttCertAuthAddress, mqttTestCaCertFile, hubclient.DefaultTimeoutSec)
 	err := client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
@@ -133,7 +130,7 @@ func TestMQTTPubSub(t *testing.T) {
 	defer rxMutex.Unlock()
 	require.Equalf(t, msg1, rx, "Did not receive the message")
 
-	client.Disconnect()
+	client.Close()
 }
 
 func TestMQTTMultipleSubscriptions(t *testing.T) {
@@ -166,6 +163,7 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 	client.Subscribe(TEST_TOPIC, handler1)
 	client.Subscribe(TEST_TOPIC, handler2)
 	err = client.Publish(TEST_TOPIC, []byte(msg1))
+	assert.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 
 	rxMutex.Lock()
@@ -178,6 +176,7 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 	rxMutex.Unlock()
 	client.Unsubscribe(TEST_TOPIC)
 	err = client.Publish(TEST_TOPIC, []byte(msg2))
+	assert.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 
 	rxMutex.Lock()
@@ -189,6 +188,7 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 
 	client.Subscribe(TEST_TOPIC, handler1)
 	err = client.Publish(TEST_TOPIC, []byte(msg2))
+	assert.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 
 	rxMutex.Lock()
@@ -203,6 +203,7 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 	client.Subscribe(TEST_TOPIC, handler2)
 	client.Unsubscribe(TEST_TOPIC)
 	err = client.Publish(TEST_TOPIC, []byte(msg2))
+	assert.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 
 	rxMutex.Lock()
@@ -210,7 +211,7 @@ func TestMQTTMultipleSubscriptions(t *testing.T) {
 	assert.Equalf(t, "", rx2, "Did not receive the message on handler 2")
 	rxMutex.Unlock()
 
-	client.Disconnect()
+	client.Close()
 }
 
 func TestMQTTBadUnsubscribe(t *testing.T) {
@@ -221,7 +222,7 @@ func TestMQTTBadUnsubscribe(t *testing.T) {
 	require.NoError(t, err)
 
 	client.Unsubscribe(TEST_TOPIC)
-	client.Disconnect()
+	client.Close()
 }
 
 func TestMQTTPubNoConnect(t *testing.T) {
@@ -234,7 +235,7 @@ func TestMQTTPubNoConnect(t *testing.T) {
 	err := client.Publish(TEST_TOPIC, []byte(msg1))
 	require.Error(t, err)
 
-	client.Disconnect()
+	client.Close()
 }
 
 func TestMQTTSubBeforeConnect(t *testing.T) {
@@ -266,7 +267,7 @@ func TestMQTTSubBeforeConnect(t *testing.T) {
 	assert.Equal(t, msg, rx)
 	rxMutex.Unlock()
 
-	client.Disconnect()
+	client.Close()
 }
 
 func TestSubscribeWildcard(t *testing.T) {
@@ -301,5 +302,5 @@ func TestSubscribeWildcard(t *testing.T) {
 	assert.Equal(t, msg, rx)
 	rxMutex.Unlock()
 
-	client.Disconnect()
+	client.Close()
 }

@@ -38,9 +38,9 @@ func TestPublishAction(t *testing.T) {
 		rxParams = params
 	})
 
-	err := consumerClient.Start()
+	err := consumerClient.Connect()
 	assert.NoError(t, err)
-	err = deviceClient.Start()
+	err = deviceClient.Connect()
 	assert.NoError(t, err)
 
 	time.Sleep(time.Millisecond)
@@ -53,8 +53,8 @@ func TestPublishAction(t *testing.T) {
 	assert.Equal(t, actionName, rxName)
 	assert.Equal(t, actionInput, rxParams)
 
-	deviceClient.Stop()
-	consumerClient.Stop()
+	deviceClient.Close()
+	consumerClient.Close()
 	// make sure it doest reconnect
 	time.Sleep(1 * time.Second)
 }
@@ -80,8 +80,9 @@ func TestPublishConfig(t *testing.T) {
 		rxID = thingID
 	})
 
-	err := consumerClient.Start()
-	err = deviceClient.Start()
+	err := consumerClient.Connect()
+	assert.NoError(t, err)
+	err = deviceClient.Connect()
 	assert.NoError(t, err)
 
 	time.Sleep(100 * time.Millisecond)
@@ -93,8 +94,8 @@ func TestPublishConfig(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	assert.Equal(t, config1["prop1"], rx["prop1"])
 	assert.Equal(t, thingID, rxID)
-	deviceClient.Stop()
-	consumerClient.Stop()
+	deviceClient.Close()
+	consumerClient.Close()
 }
 
 func TestPublishEvent(t *testing.T) {
@@ -110,9 +111,9 @@ func TestPublishEvent(t *testing.T) {
 	deviceClient := hubclient.NewMqttHubDeviceClient(deviceID, mqttAddress,
 		mqttTestCaCertFile, mqttTestClientCertFile, mqttTestClientKeyFile)
 
-	err := deviceClient.Start()
+	err := deviceClient.Connect()
 	assert.NoError(t, err)
-	err = consumerClient.Start()
+	err = consumerClient.Connect()
 	assert.NoError(t, err)
 	consumerClient.SubscribeToEvents(thingID, func(thingID string, event map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishEvent: Received event of Thing %s from client %s", thingID, sender)
@@ -128,8 +129,8 @@ func TestPublishEvent(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	assert.Equal(t, event1["eventName"], rx["eventName"])
 
-	deviceClient.Stop()
-	consumerClient.Stop()
+	deviceClient.Close()
+	consumerClient.Close()
 }
 
 func TestPublishPropertyValues(t *testing.T) {
@@ -145,9 +146,9 @@ func TestPublishPropertyValues(t *testing.T) {
 	deviceClient := hubclient.NewMqttHubDeviceClient(deviceID, mqttAddress,
 		mqttTestCaCertFile, mqttTestClientCertFile, mqttTestClientKeyFile)
 
-	err := deviceClient.Start()
+	err := deviceClient.Connect()
 	assert.NoError(t, err)
-	err = consumerClient.Start()
+	err = consumerClient.Connect()
 	assert.NoError(t, err)
 	consumerClient.SubscribeToPropertyValues(thingID, func(thingID string, values map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishPropertyValues: Received values of Thing %s from client %s", thingID, sender)
@@ -161,8 +162,8 @@ func TestPublishPropertyValues(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	assert.Equal(t, propValues["propname"], rx["propname"])
 
-	deviceClient.Stop()
-	consumerClient.Stop()
+	deviceClient.Close()
+	consumerClient.Close()
 }
 func TestPublishTD(t *testing.T) {
 	logrus.Infof("--- TestPublishTD ---")
@@ -177,9 +178,9 @@ func TestPublishTD(t *testing.T) {
 	deviceClient := hubclient.NewMqttHubDeviceClient(deviceID, mqttAddress,
 		mqttTestCaCertFile, mqttTestClientCertFile, mqttTestClientKeyFile)
 
-	err := deviceClient.Start()
+	err := deviceClient.Connect()
 	assert.NoError(t, err)
-	err = consumerClient.Start()
+	err = consumerClient.Connect()
 	assert.NoError(t, err)
 	consumerClient.SubscribeToTD(thingID, func(thingID string, thing map[string]interface{}, sender string) {
 		logrus.Infof("TestPublishTD: Received TD of Thing %s from client %s", thingID, sender)
@@ -194,8 +195,8 @@ func TestPublishTD(t *testing.T) {
 	assert.Equal(t, td1["id"], rxTd["id"])
 
 	// TODO, check if it was received by a consumer using a consumer client
-	deviceClient.Stop()
-	consumerClient.Stop()
+	deviceClient.Close()
+	consumerClient.Close()
 }
 
 // subscribe to all things
@@ -214,9 +215,9 @@ func TestSubscribeAll(t *testing.T) {
 	deviceClient := hubclient.NewMqttHubDeviceClient(deviceID, mqttAddress,
 		mqttTestCaCertFile, mqttTestClientCertFile, mqttTestClientKeyFile)
 
-	err := pluginClient.Start()
+	err := pluginClient.Connect()
 	assert.NoError(t, err)
-	err = deviceClient.Start()
+	err = deviceClient.Connect()
 	assert.NoError(t, err)
 	pluginClient.Subscribe("", func(thingID string, msgType string, raw []byte, sender string) {
 		logrus.Infof("TestSubscribe: Received msg %s of Thing %s from client %s", msgType, thingID, sender)
@@ -236,11 +237,12 @@ func TestSubscribeAll(t *testing.T) {
 	pluginClient.Unsubscribe("")
 	time.Sleep(100 * time.Millisecond)
 	err = deviceClient.PublishTD(thingID, td1)
+	assert.NoError(t, err)
 	rxTd = nil
 	time.Sleep(100 * time.Millisecond)
 	assert.NotEqual(t, td1, rxTd)
 
 	// TODO, check if it was received by a consumer using a consumer client
-	deviceClient.Stop()
-	pluginClient.Stop()
+	deviceClient.Close()
+	pluginClient.Close()
 }

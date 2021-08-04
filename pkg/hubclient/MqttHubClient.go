@@ -41,11 +41,32 @@ type MqttHubClient struct {
 	// senderVerification bool
 }
 
+// Close the client connection
+func (client *MqttHubClient) Close() {
+	logrus.Warningf("MqttHubClient.Close")
+	client.mqttClient.Close()
+}
+
+// Connect the client connection
+func (client *MqttHubClient) Connect() error {
+	logrus.Warningf("MqttHubClient.Connect: Username='%s', connecting to '%s'. CaCertFile '%s'",
+		client.userName, client.mqttClient.hostPort, client.mqttClient.tlsCACertFile)
+	// client.senderVerification = senderVerification
+	if client.clientCertFile != "" && client.clientKeyFile != "" {
+		return client.mqttClient.ConnectWithClientCert(client.userName, client.clientCertFile, client.clientKeyFile)
+	} else {
+		return client.mqttClient.ConnectWithPassword(client.userName, client.password)
+	}
+}
+
 // PublishAction publish a Thing action request to the Hub
 func (client *MqttHubClient) PublishAction(thingID string, name string, params map[string]interface{}) error {
 	topic := strings.ReplaceAll(TopicAction, "{id}", thingID)
 	actions := map[string]interface{}{name: params}
 	message, err := json.Marshal(actions)
+	if err != nil {
+		return err
+	}
 	err = client.mqttClient.Publish(topic, message)
 	return err
 }
@@ -54,6 +75,9 @@ func (client *MqttHubClient) PublishAction(thingID string, name string, params m
 func (client *MqttHubClient) PublishConfigRequest(thingID string, values map[string]interface{}) error {
 	topic := strings.ReplaceAll(TopicSetConfig, "{id}", thingID)
 	message, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
 	err = client.mqttClient.Publish(topic, message)
 	return err
 }
@@ -83,24 +107,6 @@ func (client *MqttHubClient) PublishTD(thingID string, td map[string]interface{}
 	message, _ := json.Marshal(td)
 	err := client.mqttClient.Publish(topic, message)
 	return err
-}
-
-// Start the client connection
-func (client *MqttHubClient) Start() error {
-	logrus.Warningf("MqttHubClient.Start: Username='%s', connecting to '%s'. CaCertFile '%s'",
-		client.userName, client.mqttClient.hostPort, client.mqttClient.tlsCACertFile)
-	// client.senderVerification = senderVerification
-	if client.clientCertFile != "" && client.clientKeyFile != "" {
-		return client.mqttClient.ConnectWithClientCert(client.userName, client.clientCertFile, client.clientKeyFile)
-	} else {
-		return client.mqttClient.ConnectWithPassword(client.userName, client.password)
-	}
-}
-
-// End the client connection
-func (client *MqttHubClient) Stop() {
-	logrus.Warningf("MqttHubClient.Stop")
-	client.mqttClient.Disconnect()
 }
 
 // Subscribe subscribes to messages from Things
