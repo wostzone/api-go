@@ -12,15 +12,15 @@ import (
 
 // SetHubCommandlineArgs creates common hub commandline flag commands for parsing commandlines
 //
-// -c            /path/to/hub.yaml    optional alternative configuration, default is {home}/config/hub.yaml
-// -home         /path/to/app/home    optional alternative application home folder/ Defa
-// -certsFolder  /path/to/alt/certs   optional certificate folder, eg when using mqtt. Default is {home}/certs
-// -configFolder /path/to/alt/config  optional alternative config, eg /etc/wost
-// -address      localhost            optional message bus address
-// -certPortMqtt 9883                 mqtt port for certificate authentication
-// -unpwPortWS   9884                 websocket port for username/password authentication
-// -logFile      /path/to/plugin.log  optional logfile override
-// -logLevel warning                  for extra logging, default is hub loglevel
+//  -c            /path/to/hub.yaml    optional alternative configuration, default is {home}/config/hub.yaml
+//  -home         /path/to/app/home    optional alternative application home folder/ Defa
+//  -certsFolder  /path/to/alt/certs   optional certificate folder, eg when using mqtt. Default is {home}/certs
+//  -configFolder /path/to/alt/config  optional alternative config, eg /etc/wost
+//  -address      localhost            optional message bus address
+//  -certPortMqtt 9883                 mqtt port for certificate authentication
+//  -unpwPortWS   9884                 websocket port for username/password authentication
+//  -logFile      /path/to/plugin.log  optional logfile override
+//  -logLevel warning                  for extra logging, default is hub loglevel
 //
 func SetHubCommandlineArgs(config *HubConfig) {
 	// Flags -c and --home are handled separately in SetupConfig. It is added here to avoid flag parse error

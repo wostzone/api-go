@@ -23,6 +23,7 @@ type TLSServer struct {
 	serverKeyPath  string
 	httpServer     *http.Server
 	router         *mux.Router
+	authenticator  func(http.ResponseWriter, *http.Request) error
 }
 
 // AddHandler adds a new handler for a path.
@@ -32,6 +33,10 @@ type TLSServer struct {
 // without client certificate and which paths do require a client certificate.
 // See the http.Request object to determine if a client cert is provided.
 //
+// The server authenticator is used to authenticate the connection before passing it to the handler
+// in theory this allows for different authentications depending on the path, but for WoST we simply
+// require full authentication for all methods.
+//
 //  path to listen on. This supports wildcards
 //  handler to invoke with the request
 func (srv *TLSServer) AddHandler(path string, handler func(http.ResponseWriter, *http.Request)) {
@@ -39,7 +44,20 @@ func (srv *TLSServer) AddHandler(path string, handler func(http.ResponseWriter, 
 		logrus.Errorf("TLSServer.AddHandler Error. Start has to be called first")
 		return
 	}
-	srv.router.HandleFunc(path, handler)
+	// do we need a local copy of handler? not sure
+	local_handler := handler
+	if srv.authenticator != nil {
+		// the internal authenticator performs certificate based, basic or digest authentication if needed
+		srv.router.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
+			err := srv.authenticator(resp, req)
+			if err == nil {
+				local_handler(resp, req)
+			}
+		})
+	} else {
+		// the internal authenticator performs certificate based, basic or digest authentication if needed
+		srv.router.HandleFunc(path, handler)
+	}
 }
 
 // Start the TLS server using CA and Hub certificates from the certfolder
@@ -71,6 +89,7 @@ func (srv *TLSServer) Start() error {
 		ClientCAs:          caCertPool,
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: false,
+
 		// VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		// 	logrus.Infof("***TLS server VerifyPeerCertificate called")
 		// 	return nil
@@ -118,14 +137,18 @@ func (srv *TLSServer) Stop() {
 //  caKeyPath
 //  serverCertPath
 //  serverKeyPath
+//  optional authenticator for authenticating and authorizing requests. Returns an error if the auth fails.
 //
 // returns TLS server for handling requests
 func NewTLSServer(address string, port uint,
-	serverCertPath string, serverKeyPath string, caCertPath string) *TLSServer {
+	serverCertPath string, serverKeyPath string, caCertPath string,
+	authenticator func(http.ResponseWriter, *http.Request) error) *TLSServer {
+
 	srv := &TLSServer{
 		caCertPath:     caCertPath,
 		serverCertPath: serverCertPath,
 		serverKeyPath:  serverKeyPath,
+		authenticator:  authenticator,
 	}
 	srv.address = address
 	srv.port = port
