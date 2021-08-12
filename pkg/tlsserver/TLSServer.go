@@ -27,7 +27,6 @@ type TLSServer struct {
 }
 
 // AddHandler adds a new handler for a path.
-// Start must be called first
 // The server is configured to verify provided client certificate but does not require
 // that the client uses one. It is up to the application to decide which paths can be used
 // without client certificate and which paths do require a client certificate.
@@ -40,17 +39,16 @@ type TLSServer struct {
 //  path to listen on. This supports wildcards
 //  handler to invoke with the request
 func (srv *TLSServer) AddHandler(path string, handler func(http.ResponseWriter, *http.Request)) {
-	if srv.router == nil {
-		logrus.Errorf("TLSServer.AddHandler Error. Start has to be called first")
-		return
-	}
+
 	// do we need a local copy of handler? not sure
 	local_handler := handler
 	if srv.authenticator != nil {
 		// the internal authenticator performs certificate based, basic or digest authentication if needed
 		srv.router.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
 			err := srv.authenticator(resp, req)
-			if err == nil {
+			if err != nil {
+				srv.WriteUnauthorized(resp, fmt.Sprintf("TLSServer.HandleFunc %s: Invalid credentials", path))
+			} else {
 				local_handler(resp, req)
 			}
 		})
@@ -60,21 +58,32 @@ func (srv *TLSServer) AddHandler(path string, handler func(http.ResponseWriter, 
 	}
 }
 
+// AddJWTLogin adds a handler for obtaining a JWT token.
+//  path to login with.
+//  handler that verifies login credentials and produces a JWT token
+// FIXME: this is ugly. The JWT domain doesn't belong here
+func (srv *TLSServer) AddJWTLogin(path string, handler func(http.ResponseWriter, *http.Request)) {
+	// don't authenticate this request
+	srv.router.HandleFunc(path, handler)
+}
+
 // Start the TLS server using CA and Hub certificates from the certfolder
 // The server will request but not require a client certificate. If one is provided it must be valid.
 func (srv *TLSServer) Start() error {
 	logrus.Infof("TLSServer.Start: Starting TLS server on address: %s:%d", srv.address, srv.port)
-	srv.router = mux.NewRouter()
 
 	hubCertPEM, err := ioutil.ReadFile(srv.serverCertPath)
 	hubKeyPEM, err2 := ioutil.ReadFile(srv.serverKeyPath)
 	hubCert, err3 := tls.X509KeyPair(hubCertPEM, hubKeyPEM)
 	if err != nil || err2 != nil || err3 != nil {
-		logrus.Errorf("TLSServer.Start: Server certificate pair not found")
+		err := fmt.Errorf("TLSServer.Start: Server certificate pair not found")
+		logrus.Error(err)
 		return err
 	}
 	caCertPEM, err := ioutil.ReadFile(srv.caCertPath)
 	if err != nil {
+		err = fmt.Errorf("TLSServer.Start: Missing CA file: %s", err)
+		logrus.Error(err)
 		return err
 	}
 	caCertPool := x509.NewCertPool()
@@ -116,7 +125,7 @@ func (srv *TLSServer) Start() error {
 	// Make sure the server is listening before continuing
 	// Not pretty but it handles it
 	time.Sleep(time.Second)
-	return nil
+	return err
 }
 
 // Stop the TLS server and close all connections
@@ -131,13 +140,15 @@ func (srv *TLSServer) Stop() {
 }
 
 // Create a new TLS Server instance. Use Start/Stop to run and close connections
-//  address listening address
-//  port listening port
-//  caCertPath
-//  caKeyPath
-//  serverCertPath
-//  serverKeyPath
-//  optional authenticator for authenticating and authorizing requests. Returns an error if the auth fails.
+// The authenticator is optional to authenticate and authorize each of the requests. It returns
+// an error if auth fails, after it writes the error message to the ResponseWriter.
+//
+//  address          server listening address
+//  port             listening port
+//  caCertPath       CA certificate
+//  serverCertPath   Server certificate of this server
+//  serverKeyPath    Server key of this server
+//  authenticator    optional, for authenticating and authorizing requests
 //
 // returns TLS server for handling requests
 func NewTLSServer(address string, port uint,
@@ -145,6 +156,7 @@ func NewTLSServer(address string, port uint,
 	authenticator func(http.ResponseWriter, *http.Request) error) *TLSServer {
 
 	srv := &TLSServer{
+		router:         mux.NewRouter(),
 		caCertPath:     caCertPath,
 		serverCertPath: serverCertPath,
 		serverKeyPath:  serverKeyPath,
