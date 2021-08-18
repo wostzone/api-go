@@ -35,7 +35,7 @@ var serverKeyPath string
 
 var serverTLSConf *tls.Config
 
-func startTestServer() (*http.Server, error) {
+func startTestServer(mux *http.ServeMux) (*http.Server, error) {
 	var err error
 	httpServer := &http.Server{
 		Addr: fmt.Sprintf("%s:%d", testAddress, testPort),
@@ -43,6 +43,7 @@ func startTestServer() (*http.Server, error) {
 		// WriteTimeout: 10 * time.Second,
 		// Handler:   srv.router,
 		TLSConfig: serverTLSConf,
+		Handler:   mux,
 	}
 	go func() {
 		err = httpServer.ListenAndServeTLS("", "")
@@ -106,8 +107,9 @@ func TestNoCA(t *testing.T) {
 	path1Hit := 0
 
 	// setup server and client environment
-	srv, err := startTestServer()
-	http.HandleFunc(path1, func(http.ResponseWriter, *http.Request) {
+	mux := http.NewServeMux()
+	srv, err := startTestServer(mux)
+	mux.HandleFunc(path1, func(http.ResponseWriter, *http.Request) {
 		logrus.Infof("TestAuthCert: path1 hit")
 		path1Hit++
 	})
@@ -140,10 +142,11 @@ func TestAuthClientCert(t *testing.T) {
 	path1Hit := 0
 
 	// setup server and client environment
-	srv, err := startTestServer()
+	mux := http.NewServeMux()
+	srv, err := startTestServer(mux)
 	assert.NoError(t, err)
 	//
-	http.HandleFunc(path1, func(http.ResponseWriter, *http.Request) {
+	mux.HandleFunc(path1, func(http.ResponseWriter, *http.Request) {
 		logrus.Infof("TestAuthClientCert: path1 hit")
 		path1Hit++
 	})
@@ -222,7 +225,8 @@ func TestNoServer(t *testing.T) {
 	cl.Close()
 }
 func TestCert404(t *testing.T) {
-	srv, err := startTestServer()
+	mux := http.NewServeMux()
+	srv, err := startTestServer(mux)
 	assert.NoError(t, err)
 
 	cl, err := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
@@ -245,10 +249,11 @@ func TestAuthBasic(t *testing.T) {
 	password1 := "password1"
 
 	// setup server and client environment
-	srv, err := startTestServer()
+	mux := http.NewServeMux()
+	srv, err := startTestServer(mux)
 	assert.NoError(t, err)
 	//
-	http.HandleFunc(path2, func(resp http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc(path2, func(resp http.ResponseWriter, req *http.Request) {
 		logrus.Infof("TestAuthBasic: path1 hit")
 		username, password, ok := req.BasicAuth()
 		assert.True(t, ok)
@@ -279,11 +284,9 @@ func TestAuthJWT(t *testing.T) {
 	password1 := "password1"
 
 	// setup server and client environment
-	srv, err := startTestServer()
-	assert.NoError(t, err)
-	//
-	http.HandleFunc(pathLogin1, func(resp http.ResponseWriter, req *http.Request) {
-		var authMsg tlsclient.JwtAuthMessage
+	mux := http.NewServeMux()
+	mux.HandleFunc(pathLogin1, func(resp http.ResponseWriter, req *http.Request) {
+		var authMsg tlsclient.JwtAuthLogin
 		logrus.Infof("TestAuthJWT: login")
 		body, err := ioutil.ReadAll(req.Body)
 		assert.NoError(t, err)
@@ -292,20 +295,26 @@ func TestAuthJWT(t *testing.T) {
 		assert.Equal(t, user1, authMsg.LoginID)
 		assert.Equal(t, password1, authMsg.Secret)
 		if authMsg.LoginID == user1 {
-			resp.Write([]byte("fake auth token 123"))
+			tokens := tlsclient.JwtAuthResponse{AccessToken: "123", RefreshToken: "234"}
+			data, _ := json.Marshal(tokens)
+			resp.Write(data)
 		} else {
 			// write nothing
+			_ = err
 		}
 		path3Hit++
 	})
 	// a second loging function that returns nothing
-	http.HandleFunc(pathLogin2, func(resp http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc(pathLogin2, func(resp http.ResponseWriter, req *http.Request) {
 	})
 
-	http.HandleFunc(path3, func(http.ResponseWriter, *http.Request) {
-		logrus.Infof("TestAuthClientCert: path1 hit")
+	mux.HandleFunc(path3, func(http.ResponseWriter, *http.Request) {
+		logrus.Infof("TestAuthJWT: path3 hit")
 		path3Hit++
 	})
+	srv, err := startTestServer(mux)
+	assert.NoError(t, err)
+	//
 	//
 	cl, _ := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
 	err = cl.ConnectWithLoginID(user1, password1, tlsclient.AuthMethodJwt)
@@ -315,12 +324,79 @@ func TestAuthJWT(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, path3Hit)
 
-	// test if no auth is returned
 	cl.Close()
-	cl.LoginPath = pathLogin2
+	srv.Close()
+}
+
+func TestAuthRefreshJWT(t *testing.T) {
+	pathLogin1 := "/login"
+	pathRefresh1 := "/refresh"
+	accessToken1 := "accessToken1"
+	refreshToken1 := "refreshToken1"
+	accessToken2 := "accessToken2"
+	refreshToken2 := "refreshToken2"
+
+	// setup server and client environment
+	mux := http.NewServeMux()
+	mux.HandleFunc(pathLogin1, func(resp http.ResponseWriter, req *http.Request) {
+		logrus.Infof("TestAuthRefreshJWT: login")
+		tokens := tlsclient.JwtAuthResponse{AccessToken: accessToken1, RefreshToken: refreshToken1}
+		data, _ := json.Marshal(tokens)
+		resp.Write(data)
+	})
+	mux.HandleFunc(pathRefresh1, func(resp http.ResponseWriter, req *http.Request) {
+		logrus.Infof("TestAuthRefreshJWT: refresh")
+		tokens := tlsclient.JwtAuthResponse{AccessToken: accessToken2, RefreshToken: refreshToken2}
+		data, _ := json.Marshal(tokens)
+		resp.Write(data)
+	})
+	srv, err := startTestServer(mux)
+	assert.NoError(t, err)
+	//
+	//
+	cl, _ := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
+	err = cl.ConnectWithLoginID("user1", "pw", tlsclient.AuthMethodJwt)
+	assert.NoError(t, err)
+
+	refreshTokens, err := cl.RefreshJWTTokens()
+	assert.NoError(t, err)
+	assert.Equal(t, refreshToken2, string(refreshTokens.RefreshToken))
+
+	cl.Close()
+	srv.Close()
+}
+
+func TestAuthJWTFail(t *testing.T) {
+	pathLogin1 := "/login"
+	pathLogin2 := "/login2"
+	user1 := "user1"
+	password1 := "password1"
+
+	// setup server and client environment
+	mux := http.NewServeMux()
+	srv, err := startTestServer(mux)
+	assert.NoError(t, err)
+	//
+	mux.HandleFunc(pathLogin1, func(resp http.ResponseWriter, req *http.Request) {
+		logrus.Infof("TestAuthJWTFail: login")
+		resp.Write([]byte("invalid token"))
+	})
+
+	mux.HandleFunc(pathLogin2, func(resp http.ResponseWriter, req *http.Request) {
+		logrus.Infof("TestAuthJWTFail: path4 hit, should fail")
+		resp.WriteHeader(http.StatusUnauthorized)
+	})
+	//
+	cl, _ := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
 	err = cl.ConnectWithLoginID(user1, password1, tlsclient.AuthMethodJwt)
 	assert.Error(t, err)
-	//
+
+	cl.SetJWTAuthPaths(pathLogin2, "/wrongrefreshpath")
+	err = cl.ConnectWithLoginID(user1, password1, tlsclient.AuthMethodJwt)
+	assert.Error(t, err)
+	// refresh fails cause path not found
+	_, err = cl.RefreshJWTTokens()
+	assert.Error(t, err)
 
 	cl.Close()
 	srv.Close()

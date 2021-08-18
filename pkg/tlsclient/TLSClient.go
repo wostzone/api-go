@@ -18,17 +18,28 @@ import (
 )
 
 // Authentication methods for use with ConnectWithLoginID
+// Use AuthMethodDefault unless there is a good reason not to
 const (
-	AuthMethodBasic = "basic"
-	AuthMethodNone  = ""
-	AuthMethodJwt   = "jwt"
+	AuthMethodBasic = "basic" // basic auth for backwards compatibility when connecting to non WoST servers
+	AuthMethodNone  = ""      // disable authentication, for testing
+	AuthMethodJwt   = "jwt"   // JSON web token for use with WoST server (default)
 )
-const DefaultLoginPath = "/login"
+
+// For now use a fixed login and refresh path, shared with the TLS server.
+// Once a use-case comes up that requires something configurable then this can be changed.
+const DefaultJWTLoginPath = "/login"
+const DefaultJWTRefreshPath = "/refresh"
 
 // The login message to sent when using JWT authentication
-type JwtAuthMessage struct {
+type JwtAuthLogin struct {
 	LoginID string `json:"username"`
 	Secret  string `json:"password"`
+}
+
+// the login or refresh response
+type JwtAuthResponse struct {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 // Simple TLS Client with authentication using certificates and login/pw methods
@@ -43,12 +54,13 @@ type TLSClient struct {
 	// clientcertificate authentication
 	clientCert *x509.Certificate
 
-	// Basic authentication, default is jwt using DefaultLoginPath
-	LoginPath  string
-	authMethod string
-	userID     string
-	secret     string
-	jwtToken   string
+	// jwt authentication, default is jwt using DefaultLoginPath
+	authMethod     string
+	userID         string
+	secret         string
+	jwtLoginPath   string
+	jwtRefreshPath string
+	jwtTokens      JwtAuthResponse
 }
 
 // ClientCertificate returns the client certificate or nil if none is used
@@ -124,12 +136,16 @@ func (cl *TLSClient) ConnectWithClientCert(clientCertPath string, clientKeyPath 
 //
 //  loginID username or application ID to identify as.
 //  secret to authenticate with.
-//  authMethod to use
+//  authMethodOpt optional authentication method to use. Default is JWT
 // Returns nil if successful, or an error if setting up of authentication failed.
-func (cl *TLSClient) ConnectWithLoginID(loginID string, secret string, authMethod string) (err error) {
+func (cl *TLSClient) ConnectWithLoginID(loginID string, secret string, authMethodOpt ...string) error {
+	var err error
 	cl.userID = loginID
 	cl.secret = secret
-	cl.authMethod = authMethod
+	authMethod := AuthMethodNone
+	if len(authMethodOpt) > 0 {
+		authMethod = authMethodOpt[0]
+	}
 
 	tlsConfig := &tls.Config{
 		RootCAs:            cl.caCertPool,
@@ -146,19 +162,24 @@ func (cl *TLSClient) ConnectWithLoginID(loginID string, secret string, authMetho
 		Timeout:   cl.timeout,
 	}
 	// Authenticate
-	// basic auth is handled by the Invoke function
-	if cl.authMethod == AuthMethodJwt {
-		var jwtToken []byte
-		authMessage := JwtAuthMessage{
+	if authMethod == AuthMethodJwt {
+		authLogin := JwtAuthLogin{
 			LoginID: loginID,
 			Secret:  secret,
 		}
-		jwtToken, err = cl.Post(cl.LoginPath, authMessage)
-		cl.jwtToken = string(jwtToken)
-		if cl.jwtToken == "" {
-			err = fmt.Errorf("ConnectWithLoginID: using JWT login server didn't return an auth token")
+		resp, err2 := cl.Post(cl.jwtLoginPath, authLogin)
+		if err2 != nil {
+			err = fmt.Errorf("ConnectWithLoginID: JWT login to %s failed. %s", cl.jwtLoginPath, err2)
+			return err
+		}
+		err2 = json.Unmarshal(resp, &cl.jwtTokens)
+		if err2 != nil {
+			err = fmt.Errorf("ConnectWithLoginID: JWT login to %s has unexpected response message: %s", cl.jwtLoginPath, err2)
+			return err
 		}
 	}
+	// the authmethod is only valid after receiving a token
+	cl.authMethod = authMethod
 	return err
 }
 
@@ -169,6 +190,8 @@ func (cl *TLSClient) Get(path string) ([]byte, error) {
 }
 
 // invoke a HTTPS method and read response
+// If authentication is enabled then add the auth info to the headers
+//
 //  client is the http client to use
 //  method: GET, PUT, POST, ...
 //  addr the server to connect to
@@ -198,8 +221,12 @@ func (cl *TLSClient) Invoke(method string, path string, msg interface{}) ([]byte
 	}
 
 	// use basic auth as fallback. WoST prefers JWT or OAuth
-	if cl.authMethod == AuthMethodBasic && cl.userID != "" && cl.secret != "" {
-		req.SetBasicAuth(cl.userID, cl.secret)
+	if cl.userID != "" && cl.secret != "" {
+		if cl.authMethod == AuthMethodBasic {
+			req.SetBasicAuth(cl.userID, cl.secret)
+		} else if cl.authMethod == AuthMethodJwt {
+			req.Header.Add("Authorization", "bearer "+cl.jwtTokens.AccessToken)
+		}
 	}
 
 	// set headers
@@ -239,6 +266,26 @@ func (cl *TLSClient) Put(path string, msg interface{}) ([]byte, error) {
 	return cl.Invoke("PUT", path, msg)
 }
 
+// Refresh the JWT access and bearer token
+// This returns a struct with new access and refresh token
+func (cl *TLSClient) RefreshJWTTokens() (refreshTokens JwtAuthResponse, err error) {
+	path := cl.jwtRefreshPath
+	// refresh token exists in client cookie
+	resp, err := cl.Invoke("POST", path, []byte(""))
+	if err != nil {
+		logrus.Infof("RefreshJWTTokens: failed with error %s", err)
+		return cl.jwtTokens, err
+	}
+	err = json.Unmarshal(resp, &cl.jwtTokens)
+	return cl.jwtTokens, err
+}
+
+// SetJWTAuthPaths changes the default paths for JWT login and token refresh
+func (cl *TLSClient) SetJWTAuthPaths(loginPath, refreshPath string) {
+	cl.jwtLoginPath = loginPath
+	cl.jwtRefreshPath = refreshPath
+}
+
 // Create a new TLS Client instance.
 // If the certFolder contains a CA certificate, then server authentication is used.
 // If the certFolder also contains a client certificate and key then the client is
@@ -261,12 +308,12 @@ func NewTLSClient(address string, port uint, caCertPath string) (*TLSClient, err
 	} else {
 		caCertPEM, err := certsetup.LoadPEM("", caCertPath)
 		if err == nil {
-			logrus.Infof("TLSClient.ConnectWithClientCert: destination '%s:%d'. CA certificate '%s'",
+			logrus.Infof("TLSClient.NewTLSClient: destination '%s:%d'. CA certificate '%s'",
 				address, port, caCertPath)
 			caCertPool.AppendCertsFromPEM([]byte(caCertPEM))
 			checkServerCert = true
 		} else {
-			logrus.Errorf("TLSClient.ConnectWithClientCert: destination '%s:%d'. Missing CA certificate at '%s'",
+			logrus.Errorf("TLSClient.NewTLSClient: destination '%s:%d'. Missing CA certificate at '%s'",
 				address, port, caCertPath)
 			return nil, err
 		}
@@ -278,7 +325,8 @@ func NewTLSClient(address string, port uint, caCertPath string) (*TLSClient, err
 		timeout:         time.Second,
 		caCertPool:      caCertPool,
 		checkServerCert: checkServerCert,
-		LoginPath:       DefaultLoginPath,
+		jwtLoginPath:    DefaultJWTLoginPath,
+		jwtRefreshPath:  DefaultJWTRefreshPath,
 		authMethod:      AuthMethodNone,
 	}
 

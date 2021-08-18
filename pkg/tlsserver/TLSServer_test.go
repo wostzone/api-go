@@ -68,15 +68,17 @@ func TestNoCA(t *testing.T) {
 		serverCertPath, serverKeyPath, "", nil)
 	err := srv.Start()
 	assert.Error(t, err)
+	srv.Stop()
 }
 func TestBadCert(t *testing.T) {
 	srv := tlsserver.NewTLSServer(testAddress, testPort,
 		serverCertPath, serverCertPath, caCertPath, nil)
 	err := srv.Start()
 	assert.Error(t, err)
+	srv.Stop()
 }
 
-func TestHandler(t *testing.T) {
+func TestHandlerNoAuth(t *testing.T) {
 	path1 := "/hello"
 	path1Hit := 0
 	srv := tlsserver.NewTLSServer(testAddress, testPort,
@@ -101,43 +103,157 @@ func TestHandler(t *testing.T) {
 	srv.Stop()
 }
 
-func TestJWTLogin(t *testing.T) {
-	user1 := "user1"
-	user1Pass := "pass1"
-	path1 := "/login"
-	path1Hit := 0
-	path2 := "/hello"
-	path2Hit := 0
+func TestNoAuth(t *testing.T) {
+	path1 := "/test1"
+	loginID1 := "user1"
+	password1 := "user1pass"
+
+	// setup server and client environment
 	srv := tlsserver.NewTLSServer(testAddress, testPort,
-		serverCertPath, serverKeyPath, caCertPath, func(http.ResponseWriter, *http.Request) error {
-			//authenticator
+		serverCertPath, serverKeyPath, caCertPath,
+		func(userID, password string) error {
+			assert.Fail(t, "did not expect the auth password check")
 			return nil
 		})
 	err := srv.Start()
 	assert.NoError(t, err)
-	srv.AddJWTLogin(path1, func(resp http.ResponseWriter, req *http.Request) {
-		// return the jwt token
-		path1Hit++
-		resp.Write([]byte("faketoken"))
+	//
+	srv.AddHandler(path1, func(http.ResponseWriter, *http.Request) {
+		logrus.Infof("TestNoAuth: path1 hit")
+		assert.Fail(t, "did not expect the request to pass")
 	})
+	//
+	cl, err := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
+	assert.NoError(t, err)
+	err = cl.ConnectWithLoginID(loginID1, password1, tlsclient.AuthMethodNone)
+	assert.NoError(t, err)
+
+	// request should fail if no auth is used
+	_, err = cl.Get(path1)
+	assert.Error(t, err)
+
+	cl.Close()
+	srv.Stop()
+}
+
+func TestCertAuth(t *testing.T) {
+	path1 := "/hello"
+	path1Hit := 0
+	loginHit := 0
+	srv := tlsserver.NewTLSServer(testAddress, testPort,
+		serverCertPath, serverKeyPath, caCertPath, func(loginID1, password string) error {
+			loginHit++
+			assert.Fail(t, "did not expect login check with cert auth")
+			return fmt.Errorf("Incorrect userid or password")
+		})
+	err := srv.Start()
+	assert.NoError(t, err)
+	// handler can be added any time
+	srv.AddHandler(path1, func(http.ResponseWriter, *http.Request) {
+		logrus.Infof("TestAuthCert: path1 hit")
+		path1Hit++
+	})
+
+	cl, err := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
+	require.NoError(t, err)
+	err = cl.ConnectWithClientCert(pluginCertPath, pluginKeyPath)
+	assert.NoError(t, err)
+	_, err = cl.Get(path1)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, path1Hit)
+
+	cl.Close()
+	srv.Stop()
+}
+
+func TestJWTLogin(t *testing.T) {
+	user1 := "user1"
+	user1Pass := "pass1"
+	loginHit := 0
+	path2 := "/hello"
+	path2Hit := 0
+	srv := tlsserver.NewTLSServer(testAddress, testPort,
+		serverCertPath, serverKeyPath, caCertPath, func(loginID1, password string) error {
+			loginHit++
+			if loginID1 == user1 && password == user1Pass {
+				return nil
+			}
+			return fmt.Errorf("Incorrect userid or password")
+		})
+	err := srv.Start()
+	assert.NoError(t, err)
+	//
 	srv.AddHandler(path2, func(resp http.ResponseWriter, req *http.Request) {
 		path2Hit++
 	})
 
 	cl, err := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
 	require.NoError(t, err)
+
+	// first show that an incorrect password fails
+	err = cl.ConnectWithLoginID(user1, "wrongpassword", tlsclient.AuthMethodJwt)
+	assert.Error(t, err)
+	assert.Equal(t, 1, loginHit)
+	// this request should be unauthorized
+	_, err = cl.Get(path2)
+	assert.Error(t, err)
+	assert.Equal(t, 0, path2Hit) // should not increase
+	cl.Close()
+
+	// try again with the correct password
 	err = cl.ConnectWithLoginID(user1, user1Pass, tlsclient.AuthMethodJwt)
 	assert.NoError(t, err)
+	assert.Equal(t, 2, loginHit)
 
+	// use access token
 	_, err = cl.Get(path2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1, path2Hit)
 
 	cl.Close()
 	srv.Stop()
 }
 
-func TestQuery(t *testing.T) {
+func TestJWTRefresh(t *testing.T) {
+	user1 := "user1"
+	user1Pass := "pass1"
+	loginHit := 0
+	path2 := "/hello"
+	path2Hit := 0
+	srv := tlsserver.NewTLSServer(testAddress, testPort, serverCertPath, serverKeyPath, caCertPath,
+		func(loginID1, password string) error {
+			loginHit++
+			if loginID1 == user1 && password == user1Pass {
+				return nil
+			}
+			return fmt.Errorf("Incorrect userid or password")
+		})
+	err := srv.Start()
+	assert.NoError(t, err)
+	//
+	srv.AddHandler(path2, func(resp http.ResponseWriter, req *http.Request) {
+		path2Hit++
+	})
+
+	cl, err := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
+	require.NoError(t, err)
+
+	err = cl.ConnectWithLoginID(user1, user1Pass, tlsclient.AuthMethodJwt)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, loginHit)
+
+	_, err = cl.RefreshJWTTokens()
+	assert.NoError(t, err)
+
+	// use access token
+	_, err = cl.Get(path2)
+	require.NoError(t, err)
+	assert.Equal(t, 1, path2Hit)
+	srv.Stop()
+
+}
+
+func TestQueryParams(t *testing.T) {
 	path2 := "/hello"
 	path2Hit := 0
 	srv := tlsserver.NewTLSServer(testAddress, testPort,
@@ -213,26 +329,47 @@ func TestBadPort(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestAuthenticator(t *testing.T) {
-	path1 := "/path1"
-	loginID1 := "loginID1"
-	password1 := "password1"
-	srv := tlsserver.NewTLSServer(testAddress, testPort, // bad port
-		serverCertPath, serverKeyPath, caCertPath, func(resp http.ResponseWriter, req *http.Request) error {
-			return fmt.Errorf("not auth")
-		})
-	srv.AddHandler(path1, func(rw http.ResponseWriter, r *http.Request) {})
+// Test BASIC authentication
+func TestBasicAuth(t *testing.T) {
+	path1 := "/test1"
+	path1Hit := 0
+	loginID1 := "user1"
+	password1 := "user1pass"
 
+	// setup server and client environment
+	srv := tlsserver.NewTLSServer(testAddress, testPort,
+		serverCertPath, serverKeyPath, caCertPath,
+		func(userID, password string) error {
+			if userID == loginID1 && password == password1 {
+				return nil
+			}
+			return fmt.Errorf("Incorrect userid or password")
+		})
 	err := srv.Start()
 	assert.NoError(t, err)
-
+	//
+	srv.AddHandler(path1, func(http.ResponseWriter, *http.Request) {
+		logrus.Infof("TestBasicAuth: path1 hit")
+		path1Hit++
+	})
+	//
 	cl, err := tlsclient.NewTLSClient(testAddress, testPort, caCertPath)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	err = cl.ConnectWithLoginID(loginID1, password1, tlsclient.AuthMethodBasic)
 	assert.NoError(t, err)
 
+	// test the auth with a GET request
+	_, err = cl.Get(path1)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, path1Hit)
+
+	// test a failed login
+	cl.Close()
+	err = cl.ConnectWithLoginID(loginID1, "wrongpassword", tlsclient.AuthMethodBasic)
+	assert.NoError(t, err)
 	_, err = cl.Get(path1)
 	assert.Error(t, err)
+	assert.Equal(t, 1, path1Hit) // should not increase
 
 	cl.Close()
 	srv.Stop()

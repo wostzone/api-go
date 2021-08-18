@@ -24,6 +24,7 @@ var mqttTestCaCertFile string
 var mqttTestCaKeyFile string
 var mqttTestClientCertFile string
 var mqttTestClientKeyFile string
+var mqttTestCertFolder string
 
 const TEST_TOPIC = "test"
 
@@ -42,18 +43,18 @@ func TestMain(m *testing.M) {
 	cwd, _ := os.Getwd()
 	home := path.Join(cwd, "../../test")
 	os.Chdir(home)
-	certsFolder := path.Join(home, "certs")
+	mqttTestCertFolder = path.Join(home, "certs")
 	hubconfig.SetLogging("info", "")
 
-	mqttTestCaCertFile = path.Join(certsFolder, certsetup.CaCertFile)
-	mqttTestCaKeyFile = path.Join(certsFolder, certsetup.CaKeyFile)
-	mqttTestClientCertFile = path.Join(certsFolder, certsetup.PluginCertFile)
-	mqttTestClientKeyFile = path.Join(certsFolder, certsetup.PluginKeyFile)
+	mqttTestCaCertFile = path.Join(mqttTestCertFolder, certsetup.CaCertFile)
+	mqttTestCaKeyFile = path.Join(mqttTestCertFolder, certsetup.CaKeyFile)
+	mqttTestClientCertFile = path.Join(mqttTestCertFolder, certsetup.PluginCertFile)
+	mqttTestClientKeyFile = path.Join(mqttTestCertFolder, certsetup.PluginKeyFile)
 
 	configFolder := path.Join(home, "config")
 	// clean start
 	// removeCerts(certsFolder)
-	certsetup.CreateCertificateBundle(hostnames, certsFolder)
+	certsetup.CreateCertificateBundle(hostnames, mqttTestCertFolder)
 	// MQTT port hardcoded to 33100
 	mosqConfigPath := path.Join(configFolder, mosquittoConfigFile)
 

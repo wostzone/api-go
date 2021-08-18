@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/eclipse/paho.mqtt.golang v1.3.2
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/grandcat/zeroconf v1.0.0

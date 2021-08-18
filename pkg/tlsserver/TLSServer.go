@@ -12,18 +12,19 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"github.com/wostzone/wostlib-go/pkg/tlsclient"
 )
 
 // Simple TLS Server
 type TLSServer struct {
-	address        string
-	port           uint
-	caCertPath     string
-	serverCertPath string
-	serverKeyPath  string
-	httpServer     *http.Server
-	router         *mux.Router
-	authenticator  func(http.ResponseWriter, *http.Request) error
+	address           string
+	port              uint
+	caCertPath        string
+	serverCertPath    string
+	serverKeyPath     string
+	httpServer        *http.Server
+	router            *mux.Router
+	httpAuthenticator *HttpAuthenticator
 }
 
 // AddHandler adds a new handler for a path.
@@ -42,10 +43,10 @@ func (srv *TLSServer) AddHandler(path string, handler func(http.ResponseWriter, 
 
 	// do we need a local copy of handler? not sure
 	local_handler := handler
-	if srv.authenticator != nil {
+	if srv.httpAuthenticator != nil {
 		// the internal authenticator performs certificate based, basic or digest authentication if needed
 		srv.router.HandleFunc(path, func(resp http.ResponseWriter, req *http.Request) {
-			err := srv.authenticator(resp, req)
+			err := srv.httpAuthenticator.AuthenticateRequest(resp, req)
 			if err != nil {
 				srv.WriteUnauthorized(resp, fmt.Sprintf("TLSServer.HandleFunc %s: Invalid credentials", path))
 			} else {
@@ -56,15 +57,6 @@ func (srv *TLSServer) AddHandler(path string, handler func(http.ResponseWriter, 
 		// the internal authenticator performs certificate based, basic or digest authentication if needed
 		srv.router.HandleFunc(path, handler)
 	}
-}
-
-// AddJWTLogin adds a handler for obtaining a JWT token.
-//  path to login with.
-//  handler that verifies login credentials and produces a JWT token
-// FIXME: this is ugly. The JWT domain doesn't belong here
-func (srv *TLSServer) AddJWTLogin(path string, handler func(http.ResponseWriter, *http.Request)) {
-	// don't authenticate this request
-	srv.router.HandleFunc(path, handler)
 }
 
 // Start the TLS server using CA and Hub certificates from the certfolder
@@ -90,19 +82,11 @@ func (srv *TLSServer) Start() error {
 	caCertPool.AppendCertsFromPEM(caCertPEM)
 
 	serverTLSConf := &tls.Config{
-		Certificates: []tls.Certificate{hubCert},
-		// ClientAuth: tls.RequireAnyClientCert, // Require CA signed cert
-		// ClientAuth: tls.RequestClientCert, //optional
-		ClientAuth: tls.VerifyClientCertIfGiven,
-		// ClientAuth: tls.RequireAndVerifyClientCert,
+		Certificates:       []tls.Certificate{hubCert},
+		ClientAuth:         tls.VerifyClientCertIfGiven,
 		ClientCAs:          caCertPool,
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: false,
-
-		// VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		// 	logrus.Infof("***TLS server VerifyPeerCertificate called")
-		// 	return nil
-		// },
 	}
 
 	srv.httpServer = &http.Server{
@@ -114,12 +98,11 @@ func (srv *TLSServer) Start() error {
 	}
 
 	go func() {
+		// serverTLSConf contains certificate and key
 		err2 := srv.httpServer.ListenAndServeTLS("", "")
-		// err := cs.httpServer.ListenAndServeTLS(serverCertFile, serverKeyFile)
 		if err2 != nil && err2 != http.ErrServerClosed {
 			err = fmt.Errorf("TLSServer.Start: ListenAndServeTLS: %s", err2)
 			logrus.Error(err)
-			// logrus.Fatalf("ServeMsgBus.Start: ListenAndServeTLS error: %s", err)
 		}
 	}()
 	// Make sure the server is listening before continuing
@@ -130,8 +113,6 @@ func (srv *TLSServer) Start() error {
 
 // Stop the TLS server and close all connections
 func (srv *TLSServer) Stop() {
-	// cs.updateMutex.Lock()
-	// defer cs.updateMutex.Unlock()
 	logrus.Infof("TLSServer.Stop: Stopping TLS server")
 
 	if srv.httpServer != nil {
@@ -148,19 +129,27 @@ func (srv *TLSServer) Stop() {
 //  caCertPath       CA certificate
 //  serverCertPath   Server certificate of this server
 //  serverKeyPath    Server key of this server
-//  authenticator    optional, for authenticating and authorizing requests
+//  authenticator    optional, function to authenticate requests
 //
 // returns TLS server for handling requests
 func NewTLSServer(address string, port uint,
 	serverCertPath string, serverKeyPath string, caCertPath string,
-	authenticator func(http.ResponseWriter, *http.Request) error) *TLSServer {
+	authenticator func(userID, secret string) error) *TLSServer {
+	// for now the JWT login path is fixed. Once a use-case comes up that requires something configurable
+	// this can be updated.
+	jwtLoginPath := tlsclient.DefaultJWTLoginPath
+	hwtRefreshPath := tlsclient.DefaultJWTRefreshPath
 
 	srv := &TLSServer{
 		router:         mux.NewRouter(),
 		caCertPath:     caCertPath,
 		serverCertPath: serverCertPath,
 		serverKeyPath:  serverKeyPath,
-		authenticator:  authenticator,
+	}
+	if authenticator != nil {
+		srv.httpAuthenticator = NewHttpAuthenticator(authenticator)
+		srv.router.HandleFunc(jwtLoginPath, srv.httpAuthenticator.JwtAuth.HandleJWTLogin)
+		srv.router.HandleFunc(hwtRefreshPath, srv.httpAuthenticator.JwtAuth.HandleJWTRefresh)
 	}
 	srv.address = address
 	srv.port = port

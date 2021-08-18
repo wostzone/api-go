@@ -20,6 +20,8 @@ const mqttAddress = "localhost:33100"
 func TestPublishAction(t *testing.T) {
 	logrus.Infof("--- TestPublishAction ---")
 	deviceID := "device1"
+	// hubConfig := hubconfig.HubConfig{}
+	// hubConfig.CertsFolder = mqttTestCertFolder
 
 	thingID := "thing1"
 	var rxName string
