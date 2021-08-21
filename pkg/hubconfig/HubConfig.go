@@ -3,7 +3,6 @@ package hubconfig
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -19,6 +18,12 @@ const HubConfigName = "hub.yaml"
 
 // DefaultCertsFolder with the location of certificates
 const DefaultCertsFolder = "./certs"
+
+// location of config files wrt home folder
+const DefaultConfigFolder = "./config"
+
+// location of log files wrt home folder
+const DefaultLogsFolder = "./logs"
 
 // DefaultPort for MQTT or Websocket over TLS port
 const DefaultPortWS = 8883
@@ -70,15 +75,14 @@ func CreateDefaultHubConfig(homeFolder string) *HubConfig {
 	}
 	logrus.Infof("AppBin is: %s; Home is: %s", appBin, homeFolder)
 	config := &HubConfig{
-		// ConfigFolder: path.Join(homeFolder, "config"),
 		Home:         homeFolder,
-		ConfigFolder: path.Join(homeFolder, "config"),
+		ConfigFolder: path.Join(homeFolder, DefaultConfigFolder),
 		Plugins:      make([]string, 0),
 		Zone:         "local",
 	}
 	// config.Messenger.CertsFolder = path.Join(homeFolder, "certs")
 	config.CertsFolder = path.Join(homeFolder, DefaultCertsFolder)
-	// config.Messenger.CaCertFile = certsetup.CaCertFile
+	// config.CaCertFile = certsetup.CaCertFile
 	// config.Messenger.ServerCertFile = certsetup.ServerCertFile
 	// config.Messenger.ClientCertFile = certsetup.ClientCertFile
 	// config.Messenger.ClientKeyFile = certsetup.ClientKeyFile
@@ -118,60 +122,43 @@ func LoadConfig(configFile string, config interface{}, substituteMap map[string]
 }
 
 // LoadHubConfig loads the hub configuration
-// This uses the -home and -c commandline arguments commands without the flag package.
-// Intended for plugins or Hub apps that have their own commandlines but still need to use the
-// Hub's base configuration.
-// See also LoadCommandlineConfig() for including plugin and commandline options.
+// See also LoadCommandlineConfig() for including commandline options.
+// The following defaults are used:
+//  - The home folder is the parent of the application binary
+//  - the config folder is the 'config' subdirectory of home
+//  - the certs folder is the 'certs' subdirectory of home
+//  - the logs folder is the 'logs' subdirectory of home
+//  - the configfile to load is {config}/hub.yaml
 //
-// This checks the following commandline arguments:
-//  - Commandline "-c"  specifies an alternative hub configuration file
-//  - Commandline "--home" sets the home folder as the base of ./config, ./logs and ./bin directories
-//
-//  homeFolder overrides the default home folder. Leave empty to use parent of application binary.
+//  configFile to load. Use "" for default {home}/config/hub.yaml
+//  homeFolder to use. Use "" for default {appbin}/..
 //  pluginID to substitute optional {{.pluginID}} in the hub.yaml file
-// The current working directory is changed to this folder
-//  Returns the hub configuration and error code in case of error
-func LoadHubConfig(homeFolder string, pluginID string) (*HubConfig, error) {
+//
+// Returns the hub configuration and error code in case of error
+func LoadHubConfig(configFile string, homeFolder string, pluginID string) (*HubConfig, error) {
 	substituteMap := make(map[string]string)
 	substituteMap["pluginID"] = pluginID
 
-	args := os.Args[1:]
 	if homeFolder == "" {
-		// Option --home overrides the default home folder. Intended for testing.
-		for index, arg := range args {
-			if arg == "--home" || arg == "-home" {
-				homeFolder = args[index+1]
-				// make relative paths absolute
-				if !path.IsAbs(homeFolder) {
-					cwd, _ := os.Getwd()
-					homeFolder = path.Join(cwd, homeFolder)
-				}
-				break
-			}
-		}
+		appPath, _ := os.Executable()
+		binFolder := path.Dir(appPath)
+		homeFolder = path.Dir(binFolder)
 	}
 
 	// set configuration defaults
 	hubConfig := CreateDefaultHubConfig(homeFolder)
-	hubConfigFile := path.Join(hubConfig.ConfigFolder, HubConfigName)
 
-	// Option -c overrides the default hub config file. Intended for testing.
-	args = os.Args[1:]
-	for index, arg := range args {
-		if arg == "-c" {
-			hubConfigFile = args[index+1]
-			// make relative paths absolute
-			if !path.IsAbs(hubConfigFile) {
-				hubConfigFile = path.Join(homeFolder, hubConfigFile)
-			}
-			logrus.Infof("Commandline option '-c %s' overrides defaulthub configfile", hubConfigFile)
-			break
-		}
+	substituteMap["home"] = hubConfig.Home
+	substituteMap["config"] = hubConfig.ConfigFolder
+	substituteMap["logs"] = hubConfig.LogFolder
+	substituteMap["certs"] = hubConfig.CertsFolder
+
+	if configFile == "" {
+		configFile = path.Join(hubConfig.ConfigFolder, HubConfigName)
 	}
-	logrus.Infof("Using %s as hub config file", hubConfigFile)
-	err1 := LoadConfig(hubConfigFile, hubConfig, substituteMap)
+	logrus.Infof("Using %s as hub config file", configFile)
+	err1 := LoadConfig(configFile, hubConfig, substituteMap)
 	if err1 != nil {
-		// panic("Unable to continue without hub.yaml")
 		return hubConfig, err1
 	}
 
@@ -183,7 +170,7 @@ func LoadHubConfig(homeFolder string, pluginID string) (*HubConfig, error) {
 	// 	hubConfig.PluginFolder = path.Join(homeFolder, hubConfig.PluginFolder)
 	// }
 
-	// disabled as invalid hub config should prevent providing help
+	// disabled as invalid hub config should not prevent providing help
 	//err2 := ValidateHubConfig(hubConfig)
 	// if err2 != nil {
 	// 	return hubConfig, err2
@@ -203,17 +190,17 @@ func LoadHubConfig(homeFolder string, pluginID string) (*HubConfig, error) {
 //  pluginConfig is the configuration to load. nil to only load the hub config.
 // Returns nil on success or error
 func LoadPluginConfig(configFolder string, pluginName string, pluginConfig interface{}, substituteMap map[string]string) error {
-
+	var err error
 	// plugin config is optional
 	if pluginName != "" && pluginConfig != nil {
 		pluginConfigFile := path.Join(configFolder, pluginName+".yaml")
-		err := LoadConfig(pluginConfigFile, pluginConfig, substituteMap)
+		err = LoadConfig(pluginConfigFile, pluginConfig, substituteMap)
 		if err != nil {
 			logrus.Infof("Plugin configuration file %s not found. Ignored", pluginConfigFile)
 		}
 	}
 
-	return nil
+	return err
 }
 
 // Substitute template strings in the text
@@ -257,13 +244,6 @@ func ValidateHubConfig(config *HubConfig) error {
 	// 		return err
 	// 	}
 	// }
-
-	// Address must exist
-	if config.MqttAddress == "" {
-		err := fmt.Errorf("message bus address not provided")
-		logrus.Error(err)
-		return err
-	}
 
 	return nil
 }

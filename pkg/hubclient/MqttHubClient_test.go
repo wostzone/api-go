@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/wostzone/wostlib-go/pkg/hubclient"
+	"github.com/wostzone/wostlib-go/pkg/hubconfig"
 	"github.com/wostzone/wostlib-go/pkg/td"
 	"github.com/wostzone/wostlib-go/pkg/vocab"
 )
@@ -20,7 +21,7 @@ const mqttAddress = "localhost:33100"
 func TestPublishAction(t *testing.T) {
 	logrus.Infof("--- TestPublishAction ---")
 	deviceID := "device1"
-	// hubConfig := hubconfig.HubConfig{}
+	hubConfig := hubconfig.CreateDefaultHubConfig(homeFolder)
 	// hubConfig.CertsFolder = mqttTestCertFolder
 
 	thingID := "thing1"
@@ -29,8 +30,11 @@ func TestPublishAction(t *testing.T) {
 	actionName := "action1"
 	actionInput := map[string]interface{}{"input1": "inputValue"}
 	// Use plugin as client with certificate so no hassle with username/pwsswd in testing
-	consumerClient := hubclient.NewMqttHubDeviceClient("plugin1", mqttAddress,
-		mqttTestCaCertFile, mqttTestClientCertFile, mqttTestClientKeyFile)
+	// certificate is for localhost
+	// FIXME, this should match the constnat in MqttClient_test.go
+	hubConfig.MqttAddress = "localhost"
+	hubConfig.MqttCertPort = 33100
+	consumerClient := hubclient.NewMqttHubPluginClient("plugin1", hubConfig)
 
 	deviceClient := hubclient.NewMqttHubDeviceClient(deviceID, mqttAddress,
 		mqttTestCaCertFile, mqttTestClientCertFile, mqttTestClientKeyFile)

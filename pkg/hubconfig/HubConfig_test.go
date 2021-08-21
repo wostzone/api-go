@@ -40,16 +40,17 @@ func TestDefaultConfigWithHome(t *testing.T) {
 func TestLoadHubConfig(t *testing.T) {
 	wd, _ := os.Getwd()
 	homeFolder = path.Join(wd, "../../test")
-	// hc := hubconfig.CreateDefaultHubConfig(path.Join(wd, "../../test"))
-	// require.NotNil(t, hc)
 
-	// configFile := path.Join(hc.ConfigFolder, "hub.yaml")
-	// err := hubconfig.LoadHubConfig(configFile, hc)
-	hc, err := hubconfig.LoadHubConfig(homeFolder, "plugin1")
+	hc, err := hubconfig.LoadHubConfig("", homeFolder, "plugin1")
 	assert.NoError(t, err)
 	err = hubconfig.ValidateHubConfig(hc)
 	assert.NoError(t, err)
 	assert.Equal(t, "info", hc.Loglevel)
+
+	// loading hubconfig with default home folder fails as the pkg folder doesn't have a config
+	_, err = hubconfig.LoadHubConfig("", "", "plugin1")
+	assert.Error(t, err)
+
 }
 
 func TestSubstitute(t *testing.T) {

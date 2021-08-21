@@ -43,26 +43,54 @@ func SetHubCommandlineArgs(config *HubConfig) {
 func LoadCommandlineConfig(homeFolder string, pluginID string, pluginConfig interface{}) (*HubConfig, error) {
 	if pluginID == "" {
 		err := errors.New("LoadCommandlineConfig: Missing plugin/hub ID")
-		logrus.Fatalf("%s", err)
+		logrus.Errorf("%s", err)
 		return nil, err
 	}
-	hubConfig, err := LoadHubConfig(homeFolder, pluginID)
+
+	// Option --home overrides the default home folder.
+	args := os.Args[1:]
+	for index, arg := range args {
+		if arg == "--home" || arg == "-home" {
+			homeFolder = args[index+1]
+			// make relative paths absolute
+			if !path.IsAbs(homeFolder) {
+				cwd, _ := os.Getwd()
+				homeFolder = path.Join(cwd, homeFolder)
+			}
+			break
+		}
+	}
+
+	// Option -c overrides the default hub config file.
+	hubConfigFile := ""
+	for index, arg := range args {
+		if arg == "-c" {
+			hubConfigFile = args[index+1]
+			// make relative paths absolute
+			if !path.IsAbs(hubConfigFile) {
+				hubConfigFile = path.Join(homeFolder, hubConfigFile)
+			}
+			logrus.Infof("Commandline option '-c %s' overrides defaulthub config file", hubConfigFile)
+			break
+		}
+	}
+
+	hubConfig, err := LoadHubConfig(hubConfigFile, homeFolder, pluginID)
 	if err != nil {
 		logrus.Errorf("LoadCommandlineConfig: Failed loading Hub configuration: %s", err)
-		return hubConfig, err
+		// return hubConfig, err
 	}
-	err = LoadPluginConfig(hubConfig.ConfigFolder, pluginID, pluginConfig, nil)
-	if err != nil {
-		logrus.Errorf("LoadCommandlineConfig: Failed loading configuration for plugin '%s': %s", pluginID, err)
-		return hubConfig, err
-	}
+	// non-fatal as config file is optional and defaults should work
+	LoadPluginConfig(hubConfig.ConfigFolder, pluginID, pluginConfig, nil)
 
 	SetHubCommandlineArgs(hubConfig)
 
 	// catch parsing errors, in case flag.ErrorHandling = flag.ContinueOnError
-	err = flag.CommandLine.Parse(os.Args[1:])
-
-	if err != nil {
+	// parse commandline arguments before exiting on error
+	err3 := flag.CommandLine.Parse(os.Args[1:])
+	if err3 != nil {
+		return hubConfig, err3
+	} else if err != nil {
 		return hubConfig, err
 	}
 

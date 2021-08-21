@@ -25,6 +25,7 @@ var mqttTestCaKeyFile string
 var mqttTestClientCertFile string
 var mqttTestClientKeyFile string
 var mqttTestCertFolder string
+var homeFolder string
 
 const TEST_TOPIC = "test"
 
@@ -41,9 +42,9 @@ const testPluginID = "test-user"
 func TestMain(m *testing.M) {
 	hostnames := []string{"localhost"}
 	cwd, _ := os.Getwd()
-	home := path.Join(cwd, "../../test")
-	os.Chdir(home)
-	mqttTestCertFolder = path.Join(home, "certs")
+	homeFolder = path.Join(cwd, "../../test")
+	os.Chdir(homeFolder)
+	mqttTestCertFolder = path.Join(homeFolder, "certs")
 	hubconfig.SetLogging("info", "")
 
 	mqttTestCaCertFile = path.Join(mqttTestCertFolder, certsetup.CaCertFile)
@@ -51,7 +52,7 @@ func TestMain(m *testing.M) {
 	mqttTestClientCertFile = path.Join(mqttTestCertFolder, certsetup.PluginCertFile)
 	mqttTestClientKeyFile = path.Join(mqttTestCertFolder, certsetup.PluginKeyFile)
 
-	configFolder := path.Join(home, "config")
+	configFolder := path.Join(homeFolder, "config")
 	// clean start
 	// removeCerts(certsFolder)
 	certsetup.CreateCertificateBundle(hostnames, mqttTestCertFolder)
@@ -78,6 +79,15 @@ func TestMqttConnectWithCert(t *testing.T) {
 	// reconnect
 	err = client.ConnectWithClientCert(testPluginID, mqttTestClientCertFile, mqttTestClientKeyFile)
 	assert.NoError(t, err)
+	client.Close()
+}
+
+func TestMqttConnectNoCert(t *testing.T) {
+	logrus.Infof("--- TestMqttConnectNoCert ---")
+
+	client := hubclient.NewMqttClient(mqttCertAuthAddress, mqttTestCaCertFile, hubclient.DefaultTimeoutSec)
+	err := client.ConnectWithClientCert(testPluginID, "", "")
+	assert.Error(t, err)
 	client.Close()
 }
 
